@@ -4,6 +4,7 @@ pragma solidity ^0.8.6;
 import "./SparkLaunchSale.sol";
 import "./SparkLaunchSaleERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 
 
@@ -54,29 +55,66 @@ contract SalesFactory is Ownable{
         emit LogSetFeeAddr(_feeAddr);
     }
 
+    function calculateMaxTokensForLiquidity(
+        uint256 hardCap, 
+        uint256 tokenPriceInBNB, 
+        uint256 lpPercentage,
+        uint256 pcsListingRate,
+        uint8 decimals) 
+    public 
+    view 
+    returns(uint256)                                   
+    {
+        uint256 maxBNBAmount = (hardCap * tokenPriceInBNB)/ 10**decimals;
+        console.log(maxBNBAmount, "maxBNBAmount");
+        console.log(hardCap, "hardCap");
+        console.log(tokenPriceInBNB, "tokenPriceInBNB");
+        console.log(decimals, "decimals");
+        uint256 _BNBAmountForLiquidity = (maxBNBAmount * lpPercentage) / 10000;
+        console.log(_BNBAmountForLiquidity, "_BNBAmountForLiquidity");
+        console.log(lpPercentage, "lpPercentage");
+        console.log(pcsListingRate, "pcsListingRate");
+        uint256 _tokensAmountForLiquidity = _BNBAmountForLiquidity * pcsListingRate;
+        console.log(_tokensAmountForLiquidity, "_tokensAmountForLiquidity");
+        return(_tokensAmountForLiquidity);
+    }
+
     function deployNormalSale(
-        uint256 minParticipation, 
-        uint256 maxParticipation,
-        uint256 id, 
-        address _routerAddress,
-        uint256 _lpPercentage,
-        uint256 _pcsListingRate,
-        uint256 _liquidityLockPeriod)
+        address [] memory setupAddys,
+        uint256 [] memory uints,
+        address [] memory wlAddys,
+        uint256 [] memory tiers4WL,
+        uint256 [] memory startTimes,
+        uint256 id)
     external 
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
-        require(maxParticipation > minParticipation, "Invalid input");
-        SparklaunchSale sale = new SparklaunchSale(
-            _routerAddress, 
-            address(admin), 
-            serviceFee, feeAddr, 
-            minParticipation, 
-            maxParticipation, 
-            _lpPercentage, 
-            _pcsListingRate,
-            _liquidityLockPeriod
+        uint8 decimals = IERC20Metadata(setupAddys[3]).decimals();
+        console.log(decimals, "decimals");
+        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[10], uints[6], uints[3], uints[4], decimals);
+
+        uint256 amount = uints[10] + lpTokens;
+        console.log(amount, "amount");
+        console.log(uints[10], "uints[10]");
+        console.log(lpTokens, "lpTokens");
+
+        // Perform safe transfer
+        IERC20(setupAddys[3]).transferFrom(
+            setupAddys[4],
+            address(this),
+            amount
         );
-        
+
+        SparklaunchSale sale = new SparklaunchSale(
+            setupAddys,
+            uints,
+            wlAddys,
+            tiers4WL,
+            startTimes
+        );
+        IERC20(setupAddys[3]).approve(address(sale), amount);
+        sale.depositTokens();
+
         require(saleIdToAddress[id] == address(0), "Id already used");
         saleIdToAddress[id] = address(sale);
         saleAddressToSaleOwner[address(sale)] = msg.sender;

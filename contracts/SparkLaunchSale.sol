@@ -28,6 +28,7 @@ contract SparklaunchSale {
     uint256 public liquidityUnlockTime;
     uint256 public liquidityLockPeriod;
     uint8 public decimals;
+    address public factory;
 
     // Admin contract
     IAdmin1 public admin;
@@ -102,6 +103,12 @@ contract SparklaunchSale {
         _;
     }
 
+    // Restricting calls only to factory
+    modifier onlyFactory() {
+        require(msg.sender == factory, "Restricted to sale owner.");
+        _;
+    }
+
     // Restricting calls only to sale owner or Admin
     modifier onlySaleOwnerOrAdmin() {
         require(msg.sender == sale.saleOwner || admin.isAdmin(msg.sender), "Restricted to sale owner and admin.");
@@ -138,30 +145,36 @@ contract SparklaunchSale {
     event LogEditMaxParticipation(uint256 maxP);
     event LogEditMinParticipation(uint256 minP);
     
+
     constructor(
-        address _routerAddress,
-        address _admin, 
-        uint256 _serviceFee, 
-        address _feeAddr, 
-        uint256 _minParticipation, 
-        uint256 _maxParticipation,
-        uint256 _lpPercentage,   // from total of 10000
-        uint256 _pcsListingRate, // amount of tokens for 1 bnb
-        uint256 _liquidityLockPeriod){
-        require(_admin != address(0), "Address zero validation");
-        require(_feeAddr != address(0), "Address zero validation");
-        require(_lpPercentage >= 5100 && _lpPercentage <= 10000, "Min 51%, Max 100%");
-        IDEXRouter _dexRouter = IDEXRouter(_routerAddress);
+        address [] memory setupAddys,
+        uint256 [] memory uints,
+        address [] memory wlAddys,
+        uint256 [] memory tiers4WL,
+        uint256 [] memory startTimes
+    ){
+        require(setupAddys[1] != address(0), "Address zero validation");
+        require(setupAddys[2] != address(0), "Address zero validation");
+        require(setupAddys[0] != address(0), "Address zero validation");
+        require(uints[3] >= 5100 && uints[3] <= 10000, "Min 51%, Max 100%");
+        require(uints[1] < uints[2], "Max participation should be greater than min participation");
+        IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
         defaultDexRouter = _dexRouter;
-        lpPercentage = _lpPercentage;
-        pcsListingRate = _pcsListingRate;
-        
-        liquidityLockPeriod = _liquidityLockPeriod;
-        admin = IAdmin1(_admin);
-        serviceFee = _serviceFee;
-        feeAddr = _feeAddr;
-        minParticipation = _minParticipation;
-        maxParticipation = _maxParticipation;
+        admin = IAdmin1(setupAddys[1]);
+        feeAddr = setupAddys[2];
+        serviceFee = uints[0];
+        minParticipation = uints[1];
+        maxParticipation = uints[2];
+        lpPercentage = uints[3];
+        pcsListingRate = uints[4];
+        liquidityLockPeriod = uints[5];
+        factory = msg.sender;
+
+        setSaleParams(setupAddys[3],setupAddys[4],uints[6],uints[7],uints[8],uints[9],uints[10],uints[11]);
+        grantATierMultiply(wlAddys, tiers4WL);
+        //depositTokens();
+        setRounds(startTimes);
+                
     }
 
     
@@ -176,8 +189,7 @@ contract SparklaunchSale {
         uint256 _hardCap,
         uint256 _softCap
     )
-        external
-        onlyAdmin
+        private
     {
         require(!sale.isCreated, "Sale already created.");
         require(_token != address(0), "setSaleParams: Token address can not be 0.");
@@ -228,14 +240,15 @@ contract SparklaunchSale {
         emit LogChangeLpPercentage(_lpPercentage);
     }
 
-    function grantATierMultiply(address[] memory addys, uint256[] memory tiers) external onlyAdmin {
+    function grantATierMultiply(address[] memory addys, uint256[] memory tiers) private {
+        require(block.timestamp < saleStartTime, "Sale already started");
         require(addys.length == tiers.length, "Invalid input");
         for (uint256 i = 0; i < addys.length; i++){
             grantATier(addys[i], tiers[i]);
         }
     }
 
-    function grantATier(address user, uint256 _tier) public onlyAdmin {
+    function grantATier(address user, uint256 _tier) private {
         require(_tier <= 5, "Max tier is 5");
         require(_tier != 0, "Tier can't be 0");
         require(user != address(0), "Zero address validation");
@@ -251,8 +264,8 @@ contract SparklaunchSale {
 
     // Function for owner to deposit tokens, can be called only once.
     function depositTokens()
-        external
-        onlySaleOwner
+        external 
+        onlyFactory
     {
         // Require that setSaleParams was called
         require(
@@ -573,10 +586,9 @@ contract SparklaunchSale {
 
     /// @notice     Setting rounds for sale.
     function setRounds(
-        uint256[] calldata startTimes
+        uint256[] memory startTimes
     )
-        external
-        onlyAdmin
+        private
     {
         require(sale.isCreated);
         require(tierIds.length == 0, "Rounds set already.");

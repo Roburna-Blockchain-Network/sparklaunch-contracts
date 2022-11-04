@@ -18,13 +18,9 @@ describe("SparklaunchSale", function() {
   const REV = (10 ** (18-DECIMALS)).toString();
 
 
-  const TOKEN_PRICE_IN_BNB = ethers.utils.parseEther('0.005');
-  const AMOUNT_OF_TOKENS_TO_SELL = ethers.utils.parseEther('1000');;
-  const SALE_END_DELTA = 130;
-  const TOKENS_UNLOCK_TIME_DELTA = 150;
-  const ROUNDS_START_DELTAS = [50, 70, 90, 100, 110];
-  const SOFT_CAP = ethers.utils.parseEther('500');
-  const HARD_CAP = ethers.utils.parseEther('1000');
+  
+  
+  
   const DOUBLE_HARD_CAP = ethers.utils.parseEther('2000');
   const FIRST_ROUND = 1;
   const MIDDLE_ROUND = 2;
@@ -32,6 +28,22 @@ describe("SparklaunchSale", function() {
   const PARTICIPATION_AMOUNT = ethers.utils.parseEther('1');
   const PARTICIPATION_ROUND = 1;
   const PARTICIPATION_VALUE = ethers.utils.parseEther('1');
+
+  const router = "0x10ED43C718714eb63d5aA57B78B54704E256024E"
+  const serviceFee = 100; 
+  const minP = ethers.utils.parseEther('0.05');
+  const maxP = ethers.utils.parseEther('5');
+  const lpPerc = 5100;
+  const pcsListingRate = 200;
+  const lpLockDelta = 100;
+  const TOKEN_PRICE_IN_BNB = ethers.utils.parseEther('0.002');
+  const SALE_END_DELTA = 130;
+  const PUBLIC_ROUND_DELTA = 10;
+  const SOFT_CAP = ethers.utils.parseEther('500');
+  const HARD_CAP = ethers.utils.parseEther('1000');
+  const ROUNDS_START_DELTAS = [50, 70, 90, 100, 110];
+
+
 
 
   function firstOrDefault(first, key, def) {
@@ -53,55 +65,6 @@ describe("SparklaunchSale", function() {
     return (await ethers.provider.getBlock('latest')).timestamp;
   }
 
-  async function setSaleParams(params) {
-    const blockTimestamp = await getCurrentBlockTimestamp();
-    const saleStart = await getCurrentBlockTimestamp() + 10;
-    const publicRound = 10;
-    const token = firstOrDefault(params, 'token', SaleToken.address);
-    const saleOwner = firstOrDefault(params, 'saleOwner', deployer.address);
-    const tokenPriceInBNB = firstOrDefault(params, 'tokenPriceInBNB', TOKEN_PRICE_IN_BNB);
-    const softCap = firstOrDefault(params, 'softCap', SOFT_CAP);
-    const hardCap = firstOrDefault(params, 'hardCap', HARD_CAP);
-    const saleEnd = blockTimestamp + firstOrDefault(params, 'saleEndDelta', SALE_END_DELTA);
-
-    return await SparklaunchSale.setSaleParams(
-        token, saleOwner, tokenPriceInBNB, saleEnd,saleStart, publicRound, 
-        hardCap, softCap
-    );
-  }
-
-  async function setRounds(params) {
-    const blockTimestamp = await getCurrentBlockTimestamp();
-
-    const startTimes = firstOrDefault(params, 'startTimes', ROUNDS_START_DELTAS).map((s) => blockTimestamp+s);
-
-    return SparklaunchSale.setRounds(startTimes);
-  }
-
-  async function grantTiers() {
-    const tiers = [FIRST_ROUND, FIRST_ROUND, LAST_ROUND]
-    const addys = [deployer.address, alice.address, bob.address]
-    return SparklaunchSale.grantATierMultiply(addys, tiers);
-  }
-
-  async function depositTokens() {
-    await SaleToken.approve(SparklaunchSale.address, DOUBLE_HARD_CAP);
-    await SparklaunchSale.depositTokens();
-  }
-
-  async function runFullSetupNoDeposit(params) {
-    await setSaleParams(params);
-    await setRounds(params);
-    await grantTiers();
-  }
-
-  async function runFullSetup(params) {
-    await setSaleParams(params);
-    await setRounds(params);
-    await depositTokens();
-    await grantTiers();
-  }
-
 
   beforeEach(async function() {
     const accounts = await ethers.getSigners();
@@ -119,11 +82,27 @@ describe("SparklaunchSale", function() {
     const SalesFactoryFactory = await ethers.getContractFactory("SalesFactory");
     SalesFactory = await SalesFactoryFactory.deploy(Admin.address);
 
+    const blockTimestamp = await getCurrentBlockTimestamp();
+    
+    const ROUNDS_START_DELTAS = [50, 70, 90, 100, 110];
 
+    const startTimes =  ROUNDS_START_DELTAS.map((s) => blockTimestamp+s);
+
+    const saleEnds = blockTimestamp + SALE_END_DELTA;
+    const saleStarts = blockTimestamp + 10;
     const saleContract = await ethers.getContractFactory("SparklaunchSale");
+
+    await SaleToken.approve(SalesFactory.address, ethers.utils.parseEther("20000"));
     await SalesFactory.setFeeAddr(cedric.address);
     await SalesFactory.setServiceFee(100);
-    await SalesFactory.deployNormalSale(ethers.utils.parseEther("1"), ethers.utils.parseEther("5"), 1, "0x10ed43c718714eb63d5aa57b78b54704e256024e", 5100, 100, 100);
+    await SalesFactory.deployNormalSale(
+      [router, Admin.address, cedric.address, SaleToken.address, deployer.address], 
+      [serviceFee, minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
+       saleEnds, saleStarts, PUBLIC_ROUND_DELTA, HARD_CAP, SOFT_CAP],
+      [deployer.address, alice.address, bob.address],
+      [1, 2, 3],
+      startTimes,
+      1);
     const SparklaunchSaleFactory = await ethers.getContractFactory("SparklaunchSale");
     SparklaunchSale = SparklaunchSaleFactory.attach(await SalesFactory.allSales(0));
   });
@@ -132,113 +111,13 @@ describe("SparklaunchSale", function() {
     it("Should setup the token correctly", async function() {
       // Given
       let admin = await SparklaunchSale.admin();
+
+      const sale = await SparklaunchSale.sale();
+      console.log(sale);
       
       // Then
       expect(admin).to.equal(Admin.address);
     });
-
-    describe("Set sale parameters", async function() {
-      it("Should set the sale parameters", async function() {
-        // Given
-        const blockTimestamp = (await ethers.provider.getBlock('latest')).timestamp;
-        const saleStart = await getCurrentBlockTimestamp() + 10;
-        const publicRound = 10;
-        const token = SaleToken.address;
-        const saleOwner = deployer.address;
-        const tokenPriceInBNB = TOKEN_PRICE_IN_BNB;
-        const hardCap = HARD_CAP;
-        const softCap = SOFT_CAP;
-        const saleEnd = blockTimestamp + SALE_END_DELTA;
-
-
-        // When
-        await SparklaunchSale.setSaleParams(
-            token, saleOwner, tokenPriceInBNB, saleEnd, saleStart, publicRound, 
-            hardCap, softCap
-        );
-
-        // Then
-        const sale = await SparklaunchSale.sale();
-        expect(sale.token).to.equal(token);
-        expect(sale.isCreated).to.be.true;
-        expect(sale.saleOwner).to.equal(saleOwner);
-        expect(sale.tokenPriceInBNB).to.equal(tokenPriceInBNB);
-        expect(sale.hardCap).to.equal(hardCap);
-        expect(sale.softCap).to.equal(softCap);
-        expect(sale.saleEnd).to.equal(saleEnd);
-
-        // Deprecated checks
-
-        // expect(await SalesFactory.saleOwnerToSale(saleOwner)).to.equal(SparklaunchSale.address);
-        // expect(await SalesFactory.tokenToSale(token)).to.equal(SparklaunchSale.address);
-      });
-
-      it("Should not allow non-admin to set sale parameters", async function() {
-        // Given
-        await Admin.removeAdmin(deployer.address);
-
-        // Then
-        await expect(setSaleParams()).to.be.revertedWith('Only admin can call this function.');
-      });
-
-      it("Should emit SaleCreated event when parameters are set", async function() {
-        // Given
-        const blockTimestamp = (await ethers.provider.getBlock('latest')).timestamp;
-        const token = SaleToken.address;
-        const saleOwner = deployer.address;
-        const tokenPriceInBNB = TOKEN_PRICE_IN_BNB;
-        const hardCap = HARD_CAP;
-        const softCap = SOFT_CAP;
-        const saleEnd = blockTimestamp + SALE_END_DELTA;
-        const saleStart = await getCurrentBlockTimestamp() + 10;
-        const publicRound = 10;
-        
-
-        // When
-        expect(await SparklaunchSale.setSaleParams(
-            token, saleOwner, tokenPriceInBNB, saleEnd, saleStart, publicRound,
-            hardCap, softCap
-        )).to.emit(SparklaunchSale, "SaleCreated")
-        .withArgs(saleOwner, tokenPriceInBNB, saleEnd, hardCap, softCap);
-      });
-
-      it("Should not set sale parameters if sale is already created", async function() {
-        // Given
-        await setSaleParams();
-
-        // Then
-        await expect(setSaleParams()).to.be.revertedWith("Sale already created.");
-      });
-
-
-      it("Should not set sale parameters if token address is the zero address", async function() {
-        // Then
-        await expect(setSaleParams({token: ZERO_ADDRESS})).to.be.revertedWith("setSaleParams: Token address can not be 0.");
-      });
-
-      it("Should not set sale parameters if sale owner is the zero address", async function() {
-        // Then
-        await expect(setSaleParams({saleOwner: ZERO_ADDRESS})).to.be.revertedWith("Invalid sale owner address.");
-      });
-
-      it("Should not set sale parameters if token price is 0", async function() {
-        // Then
-        await expect(setSaleParams({tokenPriceInBNB: 0})).to.be.revertedWith("Invalid input.");
-      });
-
-      it("Should not set sale parameters if token amount is 0", async function() {
-        // Then
-        await expect(setSaleParams({hardCap: 0})).to.be.revertedWith("Invalid input.");
-        await expect(setSaleParams({softCap: 0})).to.be.revertedWith("Invalid input.");
-      });
-
-      it("Should not set sale parameters if sale end date is in the past", async function() {
-        // Then
-        await expect(setSaleParams({saleEndDelta: -100})).to.be.revertedWith("Invalid input.");
-      });
-
-    });
-
 
     describe("Edge Cases & Miscellaneous", async function () {
       
@@ -259,106 +138,18 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should not remove SaleToken using removeStuckTokens", async () => {
-        await setSaleParams();
 
         await expect(SparklaunchSale.removeStuckTokens(SaleToken.address, alice.address))
           .to.be.revertedWith("Can't withdraw sale token.");
       });
     });
 
-    describe.only("Set sale rounds", async function() {
-      it("Should set sale rounds", async function() {
-        // Given
-        const blockTimestamp = await getCurrentBlockTimestamp();
-        const startTimes = ROUNDS_START_DELTAS.map((s) => blockTimestamp+s);
-        
-        await setSaleParams();
-        
-
-        // When
-        await SparklaunchSale.setRounds(startTimes);
-
-        // Then
-        for (let i = 0; i < startTimes.length; i++) {
-          expect(await SparklaunchSale.tierIds(i)).to.equal(i+1);
-          expect((await SparklaunchSale.tierIdToTierStartTime(i+1))).to.equal(startTimes[i]);
-        }
-      });
-
-      it("Should not allow non-admin to set sale rounds", async function() {
-        // Given
-        await setSaleParams();
-        await Admin.removeAdmin(deployer.address);
-
-        // Then
-        await expect(setRounds()).to.be.revertedWith("Only admin can call this function.");
-      });
-
-      it("Should not set sale rounds if rounds are already set", async function() {
-        // Given
-        await setSaleParams();
-        await setRounds();
-
-        // Then
-        await expect(setRounds()).to.be.revertedWith("Rounds set already");
-      });
-
-
-      it("Should not set sale rounds if round start times are not sorted", async function() {
-        // Given
-        await setSaleParams();
-
-        // Then
-        await expect(setRounds({startTimes: [50, 45, 60, 70, 80]})).to.be.reverted;
-      });
-
-      it("Should not set sale rounds if 0 rounds are provided", async function() {
-        // Given
-        await setSaleParams();
-
-        // Then
-        await expect(setRounds({startTimes: [], maxParticipations: []})).to.be.reverted;
-      });
-
-      it("Should not set sale rounds if start times are in the past", async function() {
-        // Given
-        await setSaleParams();
-
-        // Then
-        await expect(setRounds({startTimes: [-20, 0, 10, 10, 10]})).to.be.reverted;
-      });
-
-      it("Should not set sale rounds if start times are after sale end date", async function() {
-        // Given
-        await setSaleParams();
-
-        // Then
-        await expect(setRounds({startTimes: [SALE_END_DELTA-10, SALE_END_DELTA, SALE_END_DELTA+10, SALE_END_DELTA+10, SALE_END_DELTA+10]})).to.be.reverted;
-      });
-
-      it("Should not set sale rounds if sale not created", async function() {
-        // Then
-        await expect(setRounds()).to.be.reverted;
-      });
-
-      it("Should emit RoundAdded event", async function() {
-        // Given
-        const blockTimestamp = await getCurrentBlockTimestamp();
-        const startTimes = ROUNDS_START_DELTAS.map((s) => blockTimestamp+s);
-        await setSaleParams();
-
-        // Then
-        await expect(SparklaunchSale.setRounds(startTimes))
-          .to.emit(SparklaunchSale, "RoundAdded")
-          .withArgs(1, startTimes[0]);
-      });
-
-    });
+   
   });
 
 
 
-    describe.only("Deposit tokens", async function() {
+    describe("Deposit tokens", async function() {
       it("Should allow sale owner to deposit tokens", async function() {
         // Given
         await runFullSetupNoDeposit();
@@ -962,7 +753,6 @@ describe("SparklaunchSale", function() {
        
       it("Make sure sale get’s cancelled when soft cap not reached", async function(){
          // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA]);
         await ethers.provider.send("evm_mine");
@@ -977,7 +767,7 @@ describe("SparklaunchSale", function() {
 
       it("Make sure sale doesn’t get cancelled when soft cap reached", async function(){
         // Given
-       await runFullSetup();
+        this.provider = ethers.provider;
 
        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[2]]);
        await ethers.provider.send("evm_mine");
@@ -991,6 +781,17 @@ describe("SparklaunchSale", function() {
        //await SaleToken.connect(SparklaunchSale).approve("0x10ed43c718714eb63d5aa57b78b54704e256024e", ethers.utils.parseEther('300000'));
        // When
        await SparklaunchSale.finishSale();
+       this.pairAddress = await SparklaunchSale.defaultPair()
+        console.log(this.pairAddress, "pair addr");
+        this.pair = new ethers.Contract(
+          this.pairAddress,
+          ['function totalSupply() external view returns (uint)','function balanceOf(address owner) external view returns (uint)','function approve(address spender, uint value) external returns (bool)','function decimals() external pure returns (uint8)','function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'],
+          this.provider
+        )
+        this.pairsigner =this.pair.connect(deployer) 
+
+       const reserves =  await this.pair.getReserves();
+       console.log(reserves);
        expect(await SparklaunchSale.isSaleSuccessful()).to.be.true;
        expect(await SparklaunchSale.saleFinished()).to.be.true;
 
