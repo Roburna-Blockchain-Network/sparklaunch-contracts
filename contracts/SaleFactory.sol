@@ -5,12 +5,12 @@ import "./SparkLaunchSale.sol";
 import "./SparkLaunchSaleERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
+
 
 
 contract SalesFactory is Ownable{
 
-    IAdmin1 public admin;
+    IAdmin public admin;
     address payable public feeAddr;
     uint256 public fee;
     uint256 public serviceFee;
@@ -34,7 +34,7 @@ contract SalesFactory is Ownable{
 
     constructor (address _adminContract) {
         require(_adminContract != address(0), "Invalid address");
-        admin = IAdmin1(_adminContract);
+        admin = IAdmin(_adminContract);
     }
 
     function setFee(uint256 _fee) public onlyAdmin {
@@ -66,16 +66,7 @@ contract SalesFactory is Ownable{
     returns(uint256)                                   
     {
         uint256 maxBNBAmount = (hardCap * tokenPriceInBNB)/ 10**decimals;
-        console.log(maxBNBAmount, "maxBNBAmount");
-        console.log(hardCap, "hardCap");
-        console.log(tokenPriceInBNB, "tokenPriceInBNB");
-        console.log(decimals, "decimals");
-        uint256 _BNBAmountForLiquidity = (maxBNBAmount * lpPercentage) / 10000;
-        console.log(_BNBAmountForLiquidity, "_BNBAmountForLiquidity");
-        console.log(lpPercentage, "lpPercentage");
-        console.log(pcsListingRate, "pcsListingRate");
-        uint256 _tokensAmountForLiquidity = _BNBAmountForLiquidity * pcsListingRate;
-        console.log(_tokensAmountForLiquidity, "_tokensAmountForLiquidity");
+        uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate)/ 10**18;
         return(_tokensAmountForLiquidity);
     }
 
@@ -90,15 +81,11 @@ contract SalesFactory is Ownable{
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
         uint8 decimals = IERC20Metadata(setupAddys[3]).decimals();
-        console.log(decimals, "decimals");
+    
         uint256 lpTokens = calculateMaxTokensForLiquidity(uints[10], uints[6], uints[3], uints[4], decimals);
 
         uint256 amount = uints[10] + lpTokens;
-        console.log(amount, "amount");
-        console.log(uints[10], "uints[10]");
-        console.log(lpTokens, "lpTokens");
-
-        // Perform safe transfer
+       
         IERC20(setupAddys[3]).transferFrom(
             setupAddys[4],
             address(this),
@@ -112,6 +99,7 @@ contract SalesFactory is Ownable{
             tiers4WL,
             startTimes
         );
+
         IERC20(setupAddys[3]).approve(address(sale), amount);
         sale.depositTokens();
 
@@ -124,23 +112,6 @@ contract SalesFactory is Ownable{
 
         emit SaleDeployed(address(sale));
     }
-
-   // function deployNormalSaleERC20(uint256 minParticipation, uint256 maxParticipation, uint256 id)
-   // external 
-   // payable 
-   // {   require(msg.value >= fee, "Not enough bnb sent");
-   //     require(maxParticipation > minParticipation, "Invalid input");
-   //     SparklaunchSaleERC20 sale = new SparklaunchSaleERC20(address(admin), serviceFee, feeAddr, minParticipation, maxParticipation);
-   //     require(saleIdToAddress[id] == address(0), "Id already used");
-   //     saleIdToAddress[id] = address(sale);
-   //     saleAddressToSaleOwner[address(sale)] = msg.sender;
-//
-   //     allSales.push(address(sale));
-   //     feeAddr.transfer(msg.value);
-//
-   //     emit SaleDeployed(address(sale));
-   // }
-
 
     // Function to return number of pools deployed
     function getNumberOfSalesDeployed() external view returns (uint) {

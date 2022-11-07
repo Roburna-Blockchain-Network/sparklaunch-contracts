@@ -4,23 +4,13 @@ require("@nomiclabs/hardhat-etherscan");
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
+require("./scripts/deploySale.js");
+require("./scripts/participate.js");
+require("./scripts/finishSale.js");
+require("./scripts/getSale.js");
+require("./scripts/withdrawLP.js");
+require("./scripts/withdraw.js");
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(account.address);
-  }
-});
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
-
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
 module.exports = {
   solidity: {
     version: "0.8.7",
@@ -41,8 +31,8 @@ module.exports = {
     },
 
     binance: {
-      url: `https://data-seed-prebsc-2-s1.binance.org:8545/`,
-      accounts: [`7f5b32382c7e9040d52d66aec5adc1602eafe101e66ea895f2c7446f5f407282`],
+      url: `https://bsc-dataseed4.ninicoin.io/`,
+      accounts: [`d32df9466aad3f3ec1b3485cfed0d185df4a453d2c89a22b867ba1cdece2b8fa`],
       allowUnlimitedContractSize: true
     },
   },

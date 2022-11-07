@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IDEXRouter.sol";
 import "./interfaces/IDEXFactory.sol";
 import "./interfaces/IDEXPair.sol";
+import 'hardhat/console.sol';
 
 
 
-
-interface IAdmin1 {
+interface IAdmin {
     function isAdmin(address user) external view returns (bool);
 }
 
@@ -31,16 +31,16 @@ contract SparklaunchSale {
     address public factory;
 
     // Admin contract
-    IAdmin1 public admin;
+    IAdmin public admin;
     uint256 public serviceFee;
     address public feeAddr;
     bool public isSaleSuccessful;
     bool public saleFinished;
-    uint256 public minParticipation;
-    uint256 public maxParticipation;
+    bool public lpWithdrawn;
+    uint256 public minParticipation; 
+    uint256 public maxParticipation; 
     uint256 public saleStartTime;
     uint256 public publicRoundStartDelta;
-    bool public saleCancelledTokensWithdrawn;
     address immutable dead = 0x000000000000000000000000000000000000dEaD;
     
 
@@ -56,7 +56,7 @@ contract SparklaunchSale {
         // Have tokens been deposited
         bool tokensDeposited;
         // Address of sale owner
-        address saleOwner;
+        address saleOwner;                   //+
         // Price of the token quoted in BNB
         uint256 tokenPriceInBNB;
         // Total tokens being sold
@@ -77,6 +77,7 @@ contract SparklaunchSale {
         uint256 amountBNBPaid;
         uint256 tierId;
         bool areTokensWithdrawn;
+        bool areBNBsWithdrawn;
     }
 
     // Sale
@@ -105,7 +106,7 @@ contract SparklaunchSale {
 
     // Restricting calls only to factory
     modifier onlyFactory() {
-        require(msg.sender == factory, "Restricted to sale owner.");
+        require(msg.sender == factory, "Restricted to factory.");
         _;
     }
 
@@ -144,6 +145,8 @@ contract SparklaunchSale {
     event LogBurn(uint256 _amount);
     event LogEditMaxParticipation(uint256 maxP);
     event LogEditMinParticipation(uint256 minP);
+    event LogGrantATier(address user, uint256 tier);
+    event LogChangeSaleOwner(address newOwner);
     
 
     constructor(
@@ -160,7 +163,7 @@ contract SparklaunchSale {
         require(uints[1] < uints[2], "Max participation should be greater than min participation");
         IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
         defaultDexRouter = _dexRouter;
-        admin = IAdmin1(setupAddys[1]);
+        admin = IAdmin(setupAddys[1]);
         feeAddr = setupAddys[2];
         serviceFee = uints[0];
         minParticipation = uints[1];
@@ -169,12 +172,9 @@ contract SparklaunchSale {
         pcsListingRate = uints[4];
         liquidityLockPeriod = uints[5];
         factory = msg.sender;
-
         setSaleParams(setupAddys[3],setupAddys[4],uints[6],uints[7],uints[8],uints[9],uints[10],uints[11]);
         grantATierMultiply(wlAddys, tiers4WL);
-        //depositTokens();
-        setRounds(startTimes);
-                
+        setRounds(startTimes);     
     }
 
     
@@ -233,11 +233,26 @@ contract SparklaunchSale {
     }
 
     function changeLpPercentage(uint256 _lpPercentage) external onlySaleOwner{
-        require(!sale.tokensDeposited, "Tokens already deposited.");
         require(_lpPercentage >= 5100 && _lpPercentage <= 10000, "Min 51%, Max 100%");
         require(block.timestamp < saleStartTime, "Sale already started");
         lpPercentage = _lpPercentage;
         emit LogChangeLpPercentage(_lpPercentage);
+    }
+
+    function changeSaleOwner(address _saleOwner) external onlySaleOwner{
+        require(block.timestamp < saleStartTime, "Sale already started");
+        require(_saleOwner != sale.saleOwner, "Already set to this value");
+        require(_saleOwner != address(0), "Address 0 validation");
+        sale.saleOwner = _saleOwner;
+        emit LogChangeSaleOwner(_saleOwner);
+    }
+
+    function grantATierMultiply4SaleOwner(address[] memory addys, uint256[] memory tiers) external onlySaleOwner {
+        require(block.timestamp < saleStartTime, "Sale already started");
+        require(addys.length == tiers.length, "Invalid input");
+        for (uint256 i = 0; i < addys.length; i++){
+            grantATier(addys[i], tiers[i]);
+        }
     }
 
     function grantATierMultiply(address[] memory addys, uint256[] memory tiers) private {
@@ -253,12 +268,12 @@ contract SparklaunchSale {
         require(_tier != 0, "Tier can't be 0");
         require(user != address(0), "Zero address validation");
         tier[user] = _tier;
+        emit LogGrantATier(user, _tier);
     }
 
     function calculateMaxTokensForLiquidity() public view returns(uint256){
         uint256 maxBNBAmount = (sale.hardCap * sale.tokenPriceInBNB)/ 10**decimals;
-        uint256 _BNBAmountForLiquidity = (maxBNBAmount * lpPercentage) / 10000;
-        uint256 _tokensAmountForLiquidity = _BNBAmountForLiquidity * pcsListingRate;
+        uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate)/ 10**18;
         return(_tokensAmountForLiquidity);
     }
 
@@ -284,7 +299,7 @@ contract SparklaunchSale {
 
         uint256 lpTokens = calculateMaxTokensForLiquidity();
 
-        uint256 amount = sale.hardCap + lpTokens;
+        uint256 amount = sale.hardCap.add(lpTokens);
 
         // Perform safe transfer
         sale.token.transferFrom(
@@ -311,9 +326,8 @@ contract SparklaunchSale {
         address user,
         uint256 amountBNB, 
         uint256 _tierId
-    ) internal {
-
-        ///Check user haven't participated before
+    ) private {
+       ///Check user haven't participated before
        require(!isParticipated[user], "Already participated.");
        require(tier[user] == _tierId, "Wrong Round");
        require(block.timestamp >= saleStartTime, "Sale haven't started yet");
@@ -322,6 +336,7 @@ contract SparklaunchSale {
            require(block.timestamp >= tierIdToTierStartTime[5] + publicRoundStartDelta);
        }
        require(sale.tokensDeposited == true, "Sale tokens were not deposited");
+       require(block.timestamp <= sale.saleEnd, "Sale finished");
 
         // Compute the amount of tokens user is buying
         uint256 amountOfTokensBuying =
@@ -348,7 +363,8 @@ contract SparklaunchSale {
             amountBought: amountOfTokensBuying,
             amountBNBPaid: amountBNB,
             tierId: _tierId,
-            areTokensWithdrawn: false
+            areTokensWithdrawn: false,
+            areBNBsWithdrawn: false
         });
 
         // Add participation for user.
@@ -365,7 +381,7 @@ contract SparklaunchSale {
     function withdraw() external {
         require(block.timestamp > sale.saleEnd, "Sale is running");
         require(saleFinished == true && isSaleSuccessful == true, "Sale was cancelled");
-        uint256 totalToWithdraw = 0;
+        require(isParticipated[msg.sender], "User is not a participant.");
 
         // Retrieve participation from storage
         Participation storage p = userToParticipation[msg.sender];
@@ -373,45 +389,45 @@ contract SparklaunchSale {
         require(p.areTokensWithdrawn == false, "Already withdrawn");
 
         uint256 amountWithdrawing = p.amountBought;
-        totalToWithdraw = totalToWithdraw.add(amountWithdrawing);
+        
 
         p.areTokensWithdrawn = true;
 
 
-        if(totalToWithdraw > 0) {
+        if(amountWithdrawing > 0) {
             // Transfer tokens to user
-            sale.token.transfer(msg.sender, totalToWithdraw);
+            sale.token.transfer(msg.sender, amountWithdrawing);
             // Trigger an event
-            emit TokensWithdrawn(msg.sender, totalToWithdraw);
+            emit TokensWithdrawn(msg.sender, amountWithdrawing);
         }
     }
 
-    function editMaxParticipation(uint256 _maxP) external onlyAdmin{
+    function editMaxParticipation(uint256 _maxP) external onlySaleOwner{
         require(block.timestamp < saleStartTime, "Sale already started");
         maxParticipation = _maxP;
         emit LogEditMaxParticipation(_maxP);
     }
 
-    function editMinParticipation(uint256 _minP) external onlyAdmin{
+    function editMinParticipation(uint256 _minP) external onlySaleOwner{
         require(block.timestamp < saleStartTime, "Sale already started");
         minParticipation = _minP;
         emit LogEditMaxParticipation(_minP);
     }
    
-    function finishSale() public onlySaleOwnerOrAdmin{
+    function finishSale() external onlySaleOwnerOrAdmin{
         require(block.timestamp >= sale.saleEnd, "Sale is not finished yet");
         require(saleFinished == false, "The function can be called only once");
         if(sale.totalTokensSold >= sale.softCap){
             BNBAmountForLiquidity = (sale.totalBNBRaised * lpPercentage) / 10000;
-            tokensAmountForLiquidity = BNBAmountForLiquidity / pcsListingRate;
-            addLiquidity(tokensAmountForLiquidity, BNBAmountForLiquidity);
-            lockLiquidity();
+            tokensAmountForLiquidity = (BNBAmountForLiquidity * pcsListingRate) / 10**18;
             isSaleSuccessful = true;
             saleFinished = true;
+            addLiquidity(tokensAmountForLiquidity, BNBAmountForLiquidity);
+            lockLiquidity();
         } else{
-            burnTokens();
             isSaleSuccessful = false;
             saleFinished = true;
+            burnTokens();
         }
         emit LogFinishSale(isSaleSuccessful);
     }
@@ -438,8 +454,10 @@ contract SparklaunchSale {
     }
 
     function withdrawLP() external onlySaleOwner{
-        require(liquidityUnlockTime >= block.timestamp);
+        require(block.timestamp >= liquidityUnlockTime);
+        require(lpWithdrawn != true, "Already withdrawn");
         uint256 amount = defaultPair.balanceOf(address(this));
+        lpWithdrawn = true;
         defaultPair.transfer(sale.saleOwner, amount);
         emit LogWithdrawLP(amount);
     }
@@ -451,6 +469,8 @@ contract SparklaunchSale {
         require(block.timestamp >= sale.saleEnd, "Sale running");
         // Retrieve participation from storage
         Participation storage p = userToParticipation[msg.sender];
+        require(p.areBNBsWithdrawn == false, "Already withdrawn");
+        p.areBNBsWithdrawn = true;
         uint256 amountBNBWithdrawing = p.amountBNBPaid;
         safeTransferBNB(msg.sender, amountBNBWithdrawing);
         emit LogwithdrawUserFundsIfSaleCancelled(msg.sender, amountBNBWithdrawing);
@@ -490,7 +510,7 @@ contract SparklaunchSale {
     }
 
     // Function to withdraw earnings
-    function withdrawEarningsInternal() internal  {
+    function withdrawEarningsInternal() private  {
         require(saleFinished == true && isSaleSuccessful == true, "Sale was cancelled");
         // Make sure sale ended
         require(block.timestamp >= sale.saleEnd,"Sale Running");
@@ -508,7 +528,7 @@ contract SparklaunchSale {
     }
 
     // Function to withdraw leftover
-    function withdrawLeftoverInternal() internal {
+    function withdrawLeftoverInternal() private {
         require(saleFinished == true && isSaleSuccessful == true, "Sale wasn cancelled");
         // Make sure sale ended
         require(block.timestamp >= sale.saleEnd);
@@ -518,23 +538,12 @@ contract SparklaunchSale {
         sale.leftoverWithdrawn = true;
 
         // Amount of tokens which are not sold
-        uint256 leftover = sale.hardCap.sub(sale.totalTokensSold).sub(tokensAmountForLiquidity);
+        uint256 leftover = sale.hardCap.sub(sale.totalTokensSold);
+    
 
         if (leftover > 0) {
             sale.token.transfer(msg.sender, leftover);
         }
-    }
-
-    // Function where admin can withdraw all unused funds.
-    function withdrawUnusedFunds() external onlyAdmin {
-        uint256 balanceBNB = address(this).balance;
-
-        uint256 totalReservedForRaise = sale.earningsWithdrawn ? 0 : sale.totalBNBRaised;
-
-        safeTransferBNB(
-            msg.sender,
-            balanceBNB.sub(totalReservedForRaise).sub(BNBAmountForLiquidity)
-        );
     }
 
     /// @notice     Function to get participation for passed user address
@@ -545,6 +554,7 @@ contract SparklaunchSale {
             uint256,
             uint256,
             uint256,
+            bool,
             bool
         )
     {
@@ -553,7 +563,8 @@ contract SparklaunchSale {
             p.amountBought,
             p.amountBNBPaid,
             p.tierId,
-            p.areTokensWithdrawn
+            p.areTokensWithdrawn,
+            p.areBNBsWithdrawn
         );
     }
 

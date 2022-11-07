@@ -34,10 +34,10 @@ describe("SparklaunchSale", function() {
   const minP = ethers.utils.parseEther('0.05');
   const maxP = ethers.utils.parseEther('5');
   const lpPerc = 5100;
-  const pcsListingRate = 200;
+  const pcsListingRate = ethers.utils.parseEther('200');
   const lpLockDelta = 100;
   const TOKEN_PRICE_IN_BNB = ethers.utils.parseEther('0.002');
-  const SALE_END_DELTA = 130;
+  const SALE_END_DELTA = 10000;
   const PUBLIC_ROUND_DELTA = 10;
   const SOFT_CAP = ethers.utils.parseEther('500');
   const HARD_CAP = ethers.utils.parseEther('1000');
@@ -88,11 +88,14 @@ describe("SparklaunchSale", function() {
 
     const startTimes =  ROUNDS_START_DELTAS.map((s) => blockTimestamp+s);
 
-    const saleEnds = blockTimestamp + SALE_END_DELTA;
+    const saleEnds = blockTimestamp + 10000;
+    console.log(blockTimestamp, 'blockTimestamp');
+    console.log(saleEnds, 'saleEnds');
+    console.log(startTimes, 'startTimes');
     const saleStarts = blockTimestamp + 10;
     const saleContract = await ethers.getContractFactory("SparklaunchSale");
 
-    await SaleToken.approve(SalesFactory.address, ethers.utils.parseEther("20000"));
+    await SaleToken.approve(SalesFactory.address, ethers.utils.parseEther("900000000"));
     await SalesFactory.setFeeAddr(cedric.address);
     await SalesFactory.setServiceFee(100);
     await SalesFactory.deployNormalSale(
@@ -148,39 +151,9 @@ describe("SparklaunchSale", function() {
   });
 
 
-
-    describe("Deposit tokens", async function() {
-      it("Should allow sale owner to deposit tokens", async function() {
-        // Given
-        await runFullSetupNoDeposit();
-        await SaleToken.approve(SparklaunchSale.address, DOUBLE_HARD_CAP);
-
-        // When
-        await SparklaunchSale.depositTokens();
-        // Then
-        const balance = await SaleToken.balanceOf(SparklaunchSale.address);
-        //expect(balance).to.equal(HARD_CAP);
-      });
-
-      it("Should not allow non-sale owner to deposit tokens", async function() {
-        // Given
-        await runFullSetupNoDeposit({saleOwner: bob.address});
-        await SaleToken.approve(SparklaunchSale.address, DOUBLE_HARD_CAP);
-
-        // Then
-        await expect(SparklaunchSale.depositTokens()).to.be.revertedWith("Restricted to sale owner.");
-      });
-      
-    });
-  
-
-
   context("Participation", async function() {
     describe("Participate", async function() {
       it("Should allow user to participate", async function() {
-        // Given
-        await runFullSetup();
-
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -204,8 +177,6 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should allow multiple users to participate", async function() {
-        // Given
-        await runFullSetup();
         const blockTimestamp = await getCurrentBlockTimestamp();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[2] + blockTimestamp]);
@@ -236,8 +207,6 @@ describe("SparklaunchSale", function() {
 
 
       it("Should not participate twice", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -252,8 +221,6 @@ describe("SparklaunchSale", function() {
 
 
       it("Should not participate in a round that has not started", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[5] + 10]);
         await ethers.provider.send("evm_mine");
@@ -264,8 +231,6 @@ describe("SparklaunchSale", function() {
 
 
       it("Should emit TokensSold event", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -274,23 +239,8 @@ describe("SparklaunchSale", function() {
         await expect(participate()).to.emit(SparklaunchSale, "TokensSold").withArgs(deployer.address, Math.floor(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB * MULTIPLIER));
       });
 
-      
-      it("Should not participate if tokens have not been deposited", async function() {
-        // Given
-        await setSaleParams();
-        await setRounds();
-
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        // Then
-        await expect(participate()).to.be.reverted;
-      });
 
       it("Should fail if buying 0 tokens", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -302,8 +252,6 @@ describe("SparklaunchSale", function() {
 
     describe("Withdraw tokens", async function() {
       it("Should withdraw user's tokens", async function() {
-        // Given
-        await runFullSetup();
         const withdrawAmount = (PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB)  * MULTIPLIER;
         console.log(withdrawAmount)
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
@@ -334,8 +282,6 @@ describe("SparklaunchSale", function() {
 
 
       it("Should not withdraw twice", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -355,9 +301,6 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should not withdraw before sale end", async function() {
-        // Given
-        await runFullSetup();
-
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -370,9 +313,7 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should emit TokensWithdrawn event", async function() {
-        // Given
-        await runFullSetup();
-
+      
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
@@ -392,14 +333,13 @@ describe("SparklaunchSale", function() {
 
     describe("Withdraw earnings and leftover", async function() {
       it("Should withdraw sale owner's earnings and leftovers", async function() {
-        // Given
-        await runFullSetup();
+       
 
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
-        await participate({sender: alice});
+        await participate();
 
         await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -427,8 +367,7 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should withdraw sale owner's earnings and leftovers separately", async function() {
-        // Given
-        await runFullSetup();
+      
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -465,8 +404,7 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should not withdraw twice", async function() {
-        // Given
-        await runFullSetup();
+       
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -485,8 +423,6 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should not withdraw before sale ended", async function() {
-        // Given
-        await runFullSetup();
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
@@ -501,9 +437,7 @@ describe("SparklaunchSale", function() {
       });
 
       it("Should not allow non-sale owner to withdraw", async function() {
-        // Given
-        await runFullSetup();
-
+    
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
@@ -518,106 +452,6 @@ describe("SparklaunchSale", function() {
         await expect(SparklaunchSale.connect(bob).withdrawEarningsAndLeftover()).to.be.revertedWith("Restricted to sale owner.");
       });
 
-      //TODO:
-      it("Should burn leftover if requested", async function() {
-        // Given
-        await runFullSetup();
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        await participate({sender: alice});
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        const previousBalance = await ethers.provider.getBalance(deployer.address);
-        const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
-
-        // When
-        await SparklaunchSale.finishSale();
-        await SparklaunchSale.withdrawEarningsAndLeftover();
-
-        // Then
-        const currentBalance = await ethers.provider.getBalance(deployer.address);
-        const contractBalance = await ethers.provider.getBalance(SparklaunchSale.address);
-        const currentTokenBalance = await SaleToken.balanceOf(deployer.address);
-        const contractTokenBalance = await SaleToken.balanceOf(SparklaunchSale.address);
-        const burnedTokenBalance = await SaleToken.balanceOf(ONE_ADDRESS);
-
-        expect(currentBalance).to.equal(previousBalance.add(PARTICIPATION_VALUE));
-        expect(currentTokenBalance).to.equal(previousTokenBalance);
-        expect(contractBalance).to.equal(0);
-        expect(contractTokenBalance).to.equal(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB);
-        expect(burnedTokenBalance).to.equal(AMOUNT_OF_TOKENS_TO_SELL - PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB);
-      });
-
-      //TODO:
-      it("Should not crash if leftover is 0", async function() {
-        // Given
-        await runFullSetup({hardCap: Math.floor(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB * MULTIPLIER)});
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        await participate({sender: alice});
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        const previousBalance = await ethers.provider.getBalance(deployer.address);
-        const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
-
-        // When
-        await SparklaunchSale.finishSale();
-        await SparklaunchSale.withdrawEarningsAndLeftover();
-
-        // Then
-        const currentBalance = await ethers.provider.getBalance(deployer.address);
-        const contractBalance = await ethers.provider.getBalance(SparklaunchSale.address);
-        const currentTokenBalance = await SaleToken.balanceOf(deployer.address);
-        const contractTokenBalance = await SaleToken.balanceOf(SparklaunchSale.address);
-
-        expect(currentBalance).to.equal(previousBalance.add(PARTICIPATION_VALUE));
-        expect(currentTokenBalance).to.equal(previousTokenBalance);
-        expect(contractBalance).to.equal(0);
-        expect(contractTokenBalance).to.equal(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB * MULTIPLIER);
-      });
-
-      //TODO:
-      it("Should not crash if leftover is 0 and burn is requested", async function() {
-        // Given
-        await runFullSetup({hardCap: Math.floor(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB * MULTIPLIER)});
-
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        await participate({sender: alice});
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        const previousBalance = await ethers.provider.getBalance(deployer.address);
-        const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
-
-        // When
-        await SparklaunchSale.finishSale();
-        await SparklaunchSale.withdrawEarningsAndLeftover();
-
-        // Then
-        const currentBalance = await ethers.provider.getBalance(deployer.address);
-        const contractBalance = await ethers.provider.getBalance(SparklaunchSale.address);
-        const currentTokenBalance = await SaleToken.balanceOf(deployer.address);
-        const contractTokenBalance = await SaleToken.balanceOf(SparklaunchSale.address);
-        const burnedTokenBalance = await SaleToken.balanceOf(ONE_ADDRESS);
-
-        expect(currentBalance).to.equal(previousBalance.add(PARTICIPATION_VALUE));
-        expect(currentTokenBalance).to.equal(previousTokenBalance);
-        expect(contractBalance).to.equal(0);
-        expect(contractTokenBalance).to.equal(PARTICIPATION_VALUE / TOKEN_PRICE_IN_BNB * MULTIPLIER);
-        expect(burnedTokenBalance).to.equal(0);
-      });
 
       //TODO:
       xit("Should not crash if earnings are 0", async function() {
@@ -769,14 +603,38 @@ describe("SparklaunchSale", function() {
         // Given
         this.provider = ethers.provider;
 
+       await SparklaunchSale.changeLpPercentage(10000);
+       
+       const tierA = await SparklaunchSale.tier(alice.address);
+       console.log(tierA,'tierA');
        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[2]]);
        await ethers.provider.send("evm_mine");
 
-       participate({participationValue: ethers.utils.parseEther("5")});
-       participate({registrant: alice});
+       //await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
+       const previoussBalance = await ethers.provider.getBalance(deployer.address);
+       console.log(previoussBalance,'previoussBalance');
+       const previoussBalancea = await ethers.provider.getBalance(alice.address);
+       console.log(previoussBalancea,'previoussBalancea');
+       //participate({participationValue: ethers.utils.parseEther("2")});
+       //participate({registrant: alice});
+       await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
+       //await SparklaunchSale.connect(alice).participate(2, {value: ethers.utils.parseEther('1')});
+       const current = await ethers.provider.getBalance(deployer.address);
+       console.log(current,'current');
+       const currenta = await ethers.provider.getBalance(alice.address);
+       console.log(currenta,'currenta');
+
+       const dP = await SparklaunchSale.getParticipation(deployer.address);
+       const aP = await SparklaunchSale.getParticipation(alice.address);
+       console.log(dP, 'dP');
+       console.log(aP, 'aP');
 
        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA]);
        await ethers.provider.send("evm_mine");
+
+       const contractBalanceel = await ethers.provider.getBalance(SparklaunchSale.address);
+       const contractBalancee2l = await ethers.utils.formatEther(contractBalanceel);
+       console.log(contractBalancee2l, 'contractBalancee2l');
        
        //await SaleToken.connect(SparklaunchSale).approve("0x10ed43c718714eb63d5aa57b78b54704e256024e", ethers.utils.parseEther('300000'));
        // When
@@ -789,9 +647,34 @@ describe("SparklaunchSale", function() {
           this.provider
         )
         this.pairsigner =this.pair.connect(deployer) 
+        const BNBAmountForLiquidity = await SparklaunchSale.BNBAmountForLiquidity();
+        const BNBAmountForLiquidity2 = await ethers.utils.formatEther(BNBAmountForLiquidity);
+        console.log(BNBAmountForLiquidity2);
+       //const reserves =  await this.pair.getReserves();
+       //console.log(reserves);
+       const previousBalance = await ethers.provider.getBalance(deployer.address);
+       const previousBalanceCedric = await ethers.provider.getBalance(cedric.address);
+       const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
+       const contractBalancee = await ethers.provider.getBalance(SparklaunchSale.address);
+       const contractBalancee2 = await ethers.utils.formatEther(contractBalancee);
+       console.log(contractBalancee2, 'contractBalancee2');
 
-       const reserves =  await this.pair.getReserves();
-       console.log(reserves);
+       const sale = await SparklaunchSale.sale();
+       console.log(parseInt(sale.hardCap), parseInt(sale.totalTokensSold)); 
+       // When
+       await SparklaunchSale.withdrawEarnings(); 
+       await SparklaunchSale.withdrawLeftover(); 
+       // Then
+       const currentBalance = await ethers.provider.getBalance(deployer.address);
+       const currentBalanceCedric = await ethers.provider.getBalance(cedric.address);
+       const contractBalance = await ethers.provider.getBalance(SparklaunchSale.address);
+       const currentTokenBalance = await SaleToken.balanceOf(deployer.address);
+       const contractTokenBalance = await SaleToken.balanceOf(SparklaunchSale.address);
+       console.log(previousBalance, 'previousBalance'); 
+       console.log(currentBalance, 'currentBalance'); 
+       console.log(previousBalanceCedric, 'previousBalanceCedric'); 
+       console.log(currentBalanceCedric, 'currentBalanceCedric');
+
        expect(await SparklaunchSale.isSaleSuccessful()).to.be.true;
        expect(await SparklaunchSale.saleFinished()).to.be.true;
 
@@ -953,21 +836,23 @@ describe("SparklaunchSale", function() {
     describe("Withdraw after finish sale if sale cancelled", async function(){
 
       it("Make sure if sale cancelled sale owner can not withdraw earnings+leftover", async function(){
-        // Given
-        await runFullSetup();
-
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
         
-        await participate();
+        participate({participationValue: ethers.utils.parseEther("0.05")});
 
         await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
     
         await SparklaunchSale.finishSale();
+
+        const sale = await SparklaunchSale.sale();
+
+        expect(await SparklaunchSale.isSaleSuccessful()).to.be.false;
+       expect(await SparklaunchSale.saleFinished()).to.be.true;
         // When
         await expect(SparklaunchSale.withdrawEarnings()).to.be.reverted;
 
@@ -976,132 +861,68 @@ describe("SparklaunchSale", function() {
       });
 
       it("Make sure if sale cancelled users can withdraw deposited bnb", async function(){
-        // Given
-        await runFullSetup();
 
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
         
-        await participate();
+        participate({participationValue: ethers.utils.parseEther("0.05")});
 
         await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
+        const previousBalance = await ethers.provider.getBalance(deployer.address);
+        console.log(previousBalance,'previousBalance');
+
     
         await SparklaunchSale.finishSale();
+
+        const sale = await SparklaunchSale.sale();
+
+        expect(await SparklaunchSale.isSaleSuccessful()).to.be.false;
+        expect(await SparklaunchSale.saleFinished()).to.be.true;
 
         await expect(SparklaunchSale.withdrawUserFundsIfSaleCancelled()).to.be.not.reverted;
- 
-   
+
+        const currentBalance = await ethers.provider.getBalance(deployer.address);
+        console.log(currentBalance,'currentBalance');
+        await SparklaunchSale.withdrawUserFundsIfSaleCancelled();
       });
 
-      it("Make sure if sale cancelled sale owner can withdraw deposited tokens", async function(){
-        // Given
-        await runFullSetup();
-
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        
-        await participate();
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-    
-        await SparklaunchSale.finishSale();
-        const balance = await SaleToken.balanceOf(SparklaunchSale.address);
-        console.log(balance);
-        const sale = await SparklaunchSale.sale();
-        console.log(sale.hardCap)
-
-        await expect(SparklaunchSale.withdrawDepositedTokensIfSaleCancelled()).to.be.not.reverted;
- 
-   
-      });
-
-      it("Make sure only admin can call finish sale function", async function(){
-        // Given
-        await runFullSetup();
-
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        
-        await participate();
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-    
-
-        await expect(SparklaunchSale.connect(cedric).finishSale()).to.be.reverted;
- 
-   
-      });
 
       it("Make sure finish sale can be called only after saleEnd", async function(){
-        // Given
-        await runFullSetup();
-
-
+    
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
         
-        await participate();
+        participate({participationValue: ethers.utils.parseEther("0.05")});
 
   
         await expect(SparklaunchSale.connect(cedric).finishSale()).to.be.reverted;
  
       });
 
-      it("Make sure if sale cancelled sale owner can’t withdraw deposited tokens if tokens were not deposited", async function(){
-        // Given
-        await runFullSetupNoDeposit();
-
-
-        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-        
-        await participate();
-
-        await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
-        await ethers.provider.send("evm_mine");
-
-    
-        await SparklaunchSale.finishSale();
-        const balance = await SaleToken.balanceOf(SparklaunchSale.address);
-        console.log(balance);
-        const sale = await SparklaunchSale.sale();
-        console.log(sale.hardCap)
-
-        await expect(SparklaunchSale.withdrawDepositedTokensIfSaleCancelled()).to.be.revertedWith('Sale tokens were not deposited');
- 
-   
-      });
 
       it("Make sure only the user who have participated can call withdrawUserFundsIfSaleCancelled", async function(){
-        // Given
-        await runFullSetup();
-
 
         await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
         
-        await participate();
+        participate({participationValue: ethers.utils.parseEther("0.05")});
 
         await ethers.provider.send("evm_increaseTime", [SALE_END_DELTA - ROUNDS_START_DELTAS[0]]);
         await ethers.provider.send("evm_mine");
 
     
         await SparklaunchSale.finishSale();
+
+        const sale = await SparklaunchSale.sale();
+
+        expect(await SparklaunchSale.isSaleSuccessful()).to.be.false;
+        expect(await SparklaunchSale.saleFinished()).to.be.true;
 
         await expect(SparklaunchSale.connect(alice).withdrawUserFundsIfSaleCancelled()).to.be.reverted;
  
