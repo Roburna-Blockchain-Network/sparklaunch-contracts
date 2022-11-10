@@ -37,6 +37,7 @@ contract SparklaunchSale {
     bool public isSaleSuccessful;
     bool public saleFinished;
     bool public lpWithdrawn;
+    bool public leftoverWithdrawnCancelledSale;
     uint256 public minParticipation; 
     uint256 public maxParticipation; 
     uint256 public saleStartTime;
@@ -424,10 +425,11 @@ contract SparklaunchSale {
             saleFinished = true;
             addLiquidity(tokensAmountForLiquidity, BNBAmountForLiquidity);
             lockLiquidity();
+            burnTokens();
         } else{
             isSaleSuccessful = false;
             saleFinished = true;
-            burnTokens();
+            withdrawLeftoverIfSaleCancelled();
         }
         emit LogFinishSale(isSaleSuccessful);
     }
@@ -478,13 +480,15 @@ contract SparklaunchSale {
 
 
     function burnTokens() private {
-        // Perform safe transfer
-        uint256 amount = sale.token.balanceOf(address(this));
-        sale.token.transfer(
+        uint256 all = sale.token.balanceOf(address(this));
+        uint256 need = sale.totalTokensSold;
+        uint256 amountToBurn = all.sub(need);
+        if(amountToBurn >0){
+            sale.token.transfer(
             dead,
-            amount 
-        );
-        emit LogBurn(amount);
+            amountToBurn);
+        }
+        emit LogBurn(amountToBurn);
     }
 
     // Internal function to handle safe transfer
@@ -546,6 +550,24 @@ contract SparklaunchSale {
         }
     }
 
+    function withdrawLeftoverIfSaleCancelled() private {
+        require(saleFinished == true && isSaleSuccessful == false, "Sale wasnt cancelled");
+        // Make sure sale ended
+        require(block.timestamp >= sale.saleEnd);
+
+        // Make sure owner can't withdraw twice
+        require(!leftoverWithdrawnCancelledSale, "can't withdraw twice");
+        leftoverWithdrawnCancelledSale = true;
+
+        // Amount of tokens which are not sold
+        uint256 leftover = sale.token.balanceOf(address(this));
+    
+
+        if (leftover > 0) {
+            sale.token.transfer(msg.sender, leftover);
+        }
+    }
+
     /// @notice     Function to get participation for passed user address
     function getParticipation(address _user)
         external
@@ -578,6 +600,7 @@ contract SparklaunchSale {
     {
         // Require that token address does not match with sale token
         require(token != address(sale.token), "Can't withdraw sale token.");
+        require(token != address(defaultPair), "Can't withdraw sale lps.");
         // Safe transfer token from sale contract to beneficiary
         IERC20(token).transfer(beneficiary, IERC20(token).balanceOf(address(this)));
     }
