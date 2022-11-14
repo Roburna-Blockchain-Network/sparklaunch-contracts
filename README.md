@@ -31,6 +31,12 @@ uints[] :
 4. dex listing rate (how much tokens for 1 bnb) with 18 decimals
 5. lpLockDelta , lp lock period
 6. token price in bnb (wiith 18 decimals)
+7. Sale end time (unix timestamp)
+8. Sale satrt time (unix timestamp)
+9. Public round start time delta. Public round start time calculates like : 5th tier start time + PublicRoundStartsDelta
+10. HardCap in tokens
+11. softCap in tokens 
+
 
 WLAddys[]:
 1. array with addresses that need to be added to the whitelist and get tiers
@@ -53,5 +59,10 @@ startTimes[]:
 
 id:
 1. a unique sale id 
+
+
+SparkLaunchSale: 
+1. All sale parameters are set from the constructor
+2. 
 
 
