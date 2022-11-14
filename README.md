@@ -62,7 +62,53 @@ id:
 
 
 SparkLaunchSale: 
-1. All sale parameters are set from the constructor
-2. 
+1. All sale parameters are set from the constructor;
+2. before sale starts sale owner can change sale owner address changeSaleOwner(address _saleOwner), change lp % changeLpPercentage(uint256 _lpPercentage), add more people to whitelist grantATierMultiply4SaleOwner(), edit max and min participation editMaxParticipation(uint256 _maxP) editMinParticipation(uint256 _minP);
+3. to participate in a sale , user should call participate() with the tier number that was granted to them (from 1 to 5), if a user is not wl (public round participant) tierId should be 0 
+4. to finilize a sale sale owner should call finishSale(). 
+5. if softcap reached sale is marked as successful, that means liquidity is added and locked automatically, the tokens leftover is burned, participants can withdraw tokens they bought, sale owner can withdraw earnings if there are any.
+6. if softcap not reached sale is marked as cancelled, that means tokens are refunded to the sale owner automatically, participants can withdraw deposited bnb 
+
+functions description:
+setSaleParams() - internal function called from the constructor to setup the sale 
+
+changeLpPercentage() - a function sale owner to change a bnb % from raised funds to add liquidity before sale starts
+
+changeSaleOwner() - a function sale owner to change a sale owner address before sale starts
+
+grantATierMultiply4SaleOwner() - a function sale owner to add more people to wl before sale starts
+
+calculateMaxTokensForLiquidity() - view function to calculate max possible tokens amount for lp
+
+depositTokens() - function for depositing tokens , called only once from the factory contract
+
+participate() - a function for participating in the sale. user should call participate() with the tier number that was granted to them (from 1 to 5), if a user is not wl (public round participant) tierId should be 0 
+
+withdraw() -  a function to withdraw tokens for users who have participated and sale reached soft cap
+
+editMaxParticipation(uint256 _maxP) & editMinParticipation(uint256 _minP) -  functions for sale owner to change max and min participation before sale starts
+
+finishSale() - a function to finilize the sale. if softcap reached - adds liquidity , locks lps, burns tokens leftover. If softcap not reached - refunds lefover.
+
+withdrawLP() - a function for sale owner to withdraw locked lp 
+
+withdrawUserFundsIfSaleCancelled() - a function to withdraw deposited funds if sale cancelled
+
+withdrawEarnings() - a function for sale owner to withdraw earnings if sale successful and there are any earnings
+
+getParticipation(address _user) -  view function to get users participation info 
+
+removeStuckTokens() - an admin function to withdraw any tokens except of sale token and sale lps
+
+_calculateServiceFee -  view function to calculate service fee
+
+setRounds() - private function to set tiers start time , called from the constructor
+
+getCurrentRound() - a function to get current round
+
+
+
+
+
 
 
