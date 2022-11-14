@@ -2,7 +2,6 @@
 pragma solidity ^0.8.6;
 
 import "./SparkLaunchSale.sol";
-import "./SparkLaunchSaleERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -81,6 +80,7 @@ contract SalesFactory is Ownable{
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
         uint8 decimals = IERC20Metadata(setupAddys[3]).decimals();
+        
     
         uint256 lpTokens = calculateMaxTokensForLiquidity(uints[10], uints[6], uints[3], uints[4], decimals);
 
@@ -97,7 +97,9 @@ contract SalesFactory is Ownable{
             uints,
             wlAddys,
             tiers4WL,
-            startTimes
+            startTimes,
+            feeAddr,
+            serviceFee
         );
 
         IERC20(setupAddys[3]).approve(address(sale), amount);

@@ -1,42 +1,57 @@
-# Advanced Sample Hardhat Project
+SalesFactory Setup:
+1. deploy admin contract with admin addresses array
+2. deploy Salefactory with admin contract address as constructor argument
+3. setFee() - a function to set bnb fee for deploying a sale (in bnb, 18 decimals)
+4. setSeviceFee() - a function to set serviceFee , a percent of raised funds that will be taken from owners profit. (10000 = 100%)
+5. setFeeAddr() - set the address to receive fees
 
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
+Deploy a sale: 
+1. deployNormalSale() - call this function in order to deploy a sale. The function accepts 4 arrays with arguments. The order of array elements should be exactly the same as following:
 
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
+const tx = await factoryContract.deployERC20Sale(
+        [router, ADMIN_CONTRACT_ADDRESS, ADMIN_ADDRESS, TOKENADDDYY, ADMIN_ADDRESS], 
+        [serviceFee, minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
+         saleEnds, saleStarts, PUBLIC_ROUND_DELTA, HARD_CAP, SOFT_CAP],
+        [ADMIN_ADDRESS, ALICE_ADDRESS, BOB_ADDRESS],
+        [1, 2, 3],
+        startTimes,
+        40);
 
-Try running some of the following tasks:
+setupAddys[] : 
+1. Router address
+2. admin contract address    
+3. sale token address
+4. sale owner address
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
-npx hardhat run scripts/deploy.js
-node scripts/deploy.js
-npx eslint '**/*.js'
-npx eslint '**/*.js' --fix
-npx prettier '**/*.{json,sol,md}' --check
-npx prettier '**/*.{json,sol,md}' --write
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
-```
+uints[] :
 
-# Etherscan verification
+1. min participation (with 18 decimals)
+2. max participation (with 18 decimals)
+3. lp percentage, from total of 10000, should be >= 5100 (51%) and <= 10000 (100%)
+4. dex listing rate (how much tokens for 1 bnb) with 18 decimals
+5. lpLockDelta , lp lock period
+6. token price in bnb (wiith 18 decimals)
 
-To try out Etherscan verification, you first need to deploy a contract to an Ethereum network that's supported by Etherscan, such as Ropsten.
+WLAddys[]:
+1. array with addresses that need to be added to the whitelist and get tiers
+e.g [ADMIN_ADDRESS, ALICE_ADDRESS, BOB_ADDRESS]
 
-In this project, copy the .env.example file to a file named .env, and then edit it to fill in the details. Enter your Etherscan API key, your Ropsten node URL (eg from Alchemy), and the private key of the account which will send the deployment transaction. With a valid .env file in place, first deploy your contract:
+tiers4WL[]: 
+1. array with numbers from 1 to 5 , e.g [1, 2, 3]
+2. the number of elements in the array should be equal the number of elements in the WLAddys array
+e.g :
+WLAddys[ADMIN_ADDRESS, ALICE_ADDRESS, BOB_ADDRESS]
+tiers4WL[1, 2, 3]
+3. that means ADMIN_ADDRESS will be granted 1st tier, 
+ALICE_ADDRESS will be granted 2nd tier,
+BOB_ADDRESS will be granted 3rd tier
 
-```shell
-hardhat run --network ropsten scripts/deploy.js
-```
+startTimes[]:
+1. tiers start times
+2. should be exactly 5 numbers in the array (start time for each tier from total of 5)
+3. in unix timestamp format 
 
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
+id:
+1. a unique sale id 
 
-```shell
-npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
-```
+

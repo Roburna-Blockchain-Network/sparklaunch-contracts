@@ -155,7 +155,9 @@ contract SparklaunchSale {
         uint256 [] memory uints,
         address [] memory wlAddys,
         uint256 [] memory tiers4WL,
-        uint256 [] memory startTimes
+        uint256 [] memory startTimes,
+        address _feeAddr,
+        uint256 _serviceFee
     ){
         require(setupAddys[1] != address(0), "Address zero validation");
         require(setupAddys[2] != address(0), "Address zero validation");
@@ -165,8 +167,8 @@ contract SparklaunchSale {
         IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
         defaultDexRouter = _dexRouter;
         admin = IAdmin(setupAddys[1]);
-        feeAddr = setupAddys[2];
-        serviceFee = uints[0];
+        feeAddr = _feeAddr;
+        serviceFee = _serviceFee;
         minParticipation = uints[1];
         maxParticipation = uints[2];
         lpPercentage = uints[3];
@@ -483,7 +485,7 @@ contract SparklaunchSale {
         uint256 all = sale.token.balanceOf(address(this));
         uint256 need = sale.totalTokensSold;
         uint256 amountToBurn = all.sub(need);
-        if(amountToBurn >0){
+        if(amountToBurn > 0){
             sale.token.transfer(
             dead,
             amountToBurn);
@@ -497,20 +499,9 @@ contract SparklaunchSale {
         require(success);
     }
 
-    // Function to withdraw all the earnings and the leftover of the sale contract.
-    function withdrawEarningsAndLeftover() external onlySaleOwner {
-        withdrawEarningsInternal();
-        withdrawLeftoverInternal();
-    }
-
     // Function to withdraw only earnings
     function withdrawEarnings() external onlySaleOwner {
         withdrawEarningsInternal();
-    }
-
-    // Function to withdraw only leftover
-    function withdrawLeftover() external onlySaleOwner {
-        withdrawLeftoverInternal();
     }
 
     // Function to withdraw earnings
@@ -529,25 +520,6 @@ contract SparklaunchSale {
 
         safeTransferBNB(msg.sender, saleOwnerProfit);
         safeTransferBNB(feeAddr, totalFee);
-    }
-
-    // Function to withdraw leftover
-    function withdrawLeftoverInternal() private {
-        require(saleFinished == true && isSaleSuccessful == true, "Sale wasn cancelled");
-        // Make sure sale ended
-        require(block.timestamp >= sale.saleEnd);
-
-        // Make sure owner can't withdraw twice
-        require(!sale.leftoverWithdrawn,"can't withdraw twice");
-        sale.leftoverWithdrawn = true;
-
-        // Amount of tokens which are not sold
-        uint256 leftover = sale.hardCap.sub(sale.totalTokensSold);
-    
-
-        if (leftover > 0) {
-            sale.token.transfer(msg.sender, leftover);
-        }
     }
 
     function withdrawLeftoverIfSaleCancelled() private {
