@@ -9,7 +9,7 @@ Deploy a sale:
 1. deployNormalSale() - call this function in order to deploy a sale. The function accepts 4 arrays with arguments. The order of array elements should be exactly the same as following:
 
 const tx = await factoryContract.deployERC20Sale(
-        [router, ADMIN_CONTRACT_ADDRESS, TOKENADDDYY, ADMIN_ADDRESS], 
+        [router, ADMIN_CONTRACT_ADDRESS, TOKENADDDYY, SALEOWNER_ADDRESS], 
         [minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
          saleEnds, saleStarts, PUBLIC_ROUND_DELTA, HARD_CAP, SOFT_CAP],
         [ADMIN_ADDRESS, ALICE_ADDRESS, BOB_ADDRESS],
