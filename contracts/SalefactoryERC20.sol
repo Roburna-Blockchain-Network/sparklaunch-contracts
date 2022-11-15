@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.6;
 
-import "./SparkLaunchSale.sol";
+import "./SparkLaunchSaleERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 
 
-contract SalesFactory is Ownable{
+contract SalesFactoryERC20 is Ownable{
 
     IAdmin public admin;
     address payable public feeAddr;
@@ -59,17 +59,18 @@ contract SalesFactory is Ownable{
         uint256 tokenPriceInBNB, 
         uint256 lpPercentage,
         uint256 pcsListingRate,
-        uint8 decimals) 
+        uint8 decimals,
+        uint8 decimalsPaymentToken) 
     public 
     view 
     returns(uint256)                                   
     {
-        uint256 maxBNBAmount = (hardCap * tokenPriceInBNB)/ 10**decimals;
-        uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate)/ 10**18;
+        uint256 maxERC20Amount = (hardCap * tokenPriceInBNB)/ 10**decimals;
+        uint256 _tokensAmountForLiquidity = (maxERC20Amount * pcsListingRate)/ 10**decimalsPaymentToken;
         return(_tokensAmountForLiquidity);
     }
 
-    function deployNormalSale(
+    function deployERC20Sale(
         address [] memory setupAddys,
         uint256 [] memory uints,
         address [] memory wlAddys,
@@ -80,9 +81,9 @@ contract SalesFactory is Ownable{
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
         uint8 decimals = IERC20Metadata(setupAddys[2]).decimals();
-        
+        uint8 decimalsPaymentToken = IERC20Metadata(setupAddys[4]).decimals();
     
-        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[9], uints[5], uints[2], uints[3], decimals);
+        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[9], uints[5], uints[2], uints[3], decimals, decimalsPaymentToken);
 
         uint256 amount = uints[9] + lpTokens;
        
@@ -92,7 +93,7 @@ contract SalesFactory is Ownable{
             amount
         );
 
-        SparklaunchSale sale = new SparklaunchSale(
+        SparklaunchSaleERC20 sale = new SparklaunchSaleERC20(
             setupAddys,
             uints,
             wlAddys,

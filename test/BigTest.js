@@ -99,8 +99,8 @@ describe("SparklaunchSale", function() {
     await SalesFactory.setFeeAddr(cedric.address);
     await SalesFactory.setServiceFee(100);
     await SalesFactory.deployNormalSale(
-      [router, Admin.address, cedric.address, SaleToken.address, deployer.address], 
-      [serviceFee, minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
+      [router, Admin.address, SaleToken.address, deployer.address], 
+      [minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
        saleEnds, saleStarts, PUBLIC_ROUND_DELTA, HARD_CAP, SOFT_CAP],
       [deployer.address, alice.address, bob.address],
       [1, 2, 3],
@@ -603,7 +603,7 @@ describe("SparklaunchSale", function() {
         // Given
         this.provider = ethers.provider;
 
-       await SparklaunchSale.changeLpPercentage(10000);
+       await SparklaunchSale.changeLpPercentage(7000);
        
        const tierA = await SparklaunchSale.tier(alice.address);
        console.log(tierA,'tierA');
@@ -652,6 +652,8 @@ describe("SparklaunchSale", function() {
         console.log(BNBAmountForLiquidity2);
        //const reserves =  await this.pair.getReserves();
        //console.log(reserves);
+
+       await SparklaunchSale.withdraw();
        const previousBalance = await ethers.provider.getBalance(deployer.address);
        const previousBalanceCedric = await ethers.provider.getBalance(cedric.address);
        const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
@@ -663,7 +665,7 @@ describe("SparklaunchSale", function() {
        console.log(parseInt(sale.hardCap), parseInt(sale.totalTokensSold)); 
        // When
        await SparklaunchSale.withdrawEarnings(); 
-       await SparklaunchSale.withdrawLeftover(); 
+       
        // Then
        const currentBalance = await ethers.provider.getBalance(deployer.address);
        const currentBalanceCedric = await ethers.provider.getBalance(cedric.address);
@@ -673,7 +675,7 @@ describe("SparklaunchSale", function() {
        console.log(previousBalance, 'previousBalance'); 
        console.log(currentBalance, 'currentBalance'); 
        console.log(previousBalanceCedric, 'previousBalanceCedric'); 
-       console.log(currentBalanceCedric, 'currentBalanceCedric');
+       console.log(contractTokenBalance, 'currentcontractbalance');
 
        expect(await SparklaunchSale.isSaleSuccessful()).to.be.true;
        expect(await SparklaunchSale.saleFinished()).to.be.true;

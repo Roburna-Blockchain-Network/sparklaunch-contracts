@@ -7,47 +7,63 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IDEXRouter.sol";
 import "./interfaces/IDEXFactory.sol";
 import "./interfaces/IDEXPair.sol";
-import "hardhat/console.sol";
 
 
-interface IAdmin2 {
+
+
+interface IAdmin {
     function isAdmin(address user) external view returns (bool);
 }
+
 
 contract SparklaunchSaleERC20 {
     using SafeMath for uint256;
 
+    IDEXRouter public defaultDexRouter;
+    IDEXPair public defaultPair;
+    IERC20 public tokenERC20;
+    uint8 public tokenERC20decimals;
+    uint256 public lpPercentage;
+    uint256 public tokensAmountForLiquidity;
+    uint256 public ERC20AmountForLiquidity;
+    uint256 public pcsListingRate;
+    uint256 public liquidityUnlockTime;
+    uint256 public liquidityLockPeriod;
+    uint8 public decimals;
+    address public factory;
+
     // Admin contract
-    IAdmin2 public admin;
+    IAdmin public admin;
     uint256 public serviceFee;
     address public feeAddr;
     bool public isSaleSuccessful;
     bool public saleFinished;
-    // Token used for payment
-    address public tokenERC20;
-    uint256 public minParticipation;
-    uint256 public maxParticipation;
+    bool public lpWithdrawn;
+    bool public leftoverWithdrawnCancelledSale;
+    uint256 public minParticipation; 
+    uint256 public maxParticipation; 
     uint256 public saleStartTime;
     uint256 public publicRoundStartDelta;
-    bool public saleCancelledTokensWithdrawn;
+    address immutable dead = 0x000000000000000000000000000000000000dEaD;
+    
 
     struct Sale {
         // Token being sold
-        IERC20 saleToken;
+        IERC20 token;
         // Is sale created
         bool isCreated;
         // Are earnings withdrawn
         bool earningsWithdrawn;
         // Is leftover withdrawn
         bool leftoverWithdrawn;
-        // Have saleTokens been deposited
-        bool saleTokensDeposited;
+        // Have tokens been deposited
+        bool tokensDeposited;
         // Address of sale owner
-        address saleOwner;
+        address saleOwner;                   
         // Price of the token quoted in ERC20
-        uint256 saleTokenPriceInERC20;
-        // Total saleTokens being sold
-        uint256 totalSaleTokensSold;
+        uint256 tokenPriceInERC20;
+        // Total tokens being sold
+        uint256 totalTokensSold;
         // Total ERC20 Raised
         uint256 totalERC20Raised;
         // Sale end time
@@ -64,6 +80,7 @@ contract SparklaunchSaleERC20 {
         uint256 amountERC20Paid;
         uint256 tierId;
         bool areTokensWithdrawn;
+        bool areERC20sWithdrawn;
     }
 
     // Sale
@@ -72,7 +89,7 @@ contract SparklaunchSaleERC20 {
     // Number of users participated in the sale.
     uint256 public numberOfParticipants;
 
-    // Array storing IDS of tiers (IDs start from 1, so they can't be mapped as array indexes
+    // Array storing IDS of tiers (IDs start from 1, so they can't be mapped as array indexes)
     uint256[] public tierIds;
     // Mapping tier Id to tier start time
     mapping(uint256 => uint256) public tierIdToTierStartTime;
@@ -90,6 +107,18 @@ contract SparklaunchSaleERC20 {
         _;
     }
 
+    // Restricting calls only to factory
+    modifier onlyFactory() {
+        require(msg.sender == factory, "Restricted to factory.");
+        _;
+    }
+
+    // Restricting calls only to sale owner or Admin
+    modifier onlySaleOwnerOrAdmin() {
+        require(msg.sender == sale.saleOwner || admin.isAdmin(msg.sender), "Restricted to sale owner and admin.");
+        _;
+    }
+
     // Restricting calls only to sale admin
     modifier onlyAdmin() {
         require(
@@ -99,6 +128,7 @@ contract SparklaunchSaleERC20 {
         _;
     }
 
+
     // Events
     event TokensSold(address user, uint256 amount);
     event TokensWithdrawn(address user, uint256 amount);
@@ -107,56 +137,75 @@ contract SparklaunchSaleERC20 {
         uint256 tokenPriceInERC20,
         uint256 saleEnd,
         uint256 _hardCap,
-        uint256 _softCap,
-        address _tokenERC20
+        uint256 _softCap
     );
     event LogwithdrawUserFundsIfSaleCancelled(address user, uint256 amount);
-    event LogFinishSale(bool isSaleSucsessful);
-    event LogWithdrawDepositedTokensIfSaleCancelled(address user, uint256 amount);
+    event LogFinishSale(bool isSaleSuccessful);
     event RoundAdded(uint256 _tierId, uint256 _startTime);
+    event LogWithdrawLP(uint256 amount);
+    event LogLockLiquidity(uint256 timeStart, uint256 unlockTime);
+    event LogChangeLpPercentage(uint256 _percentage);
+    event LogBurn(uint256 _amount);
+    event LogEditMaxParticipation(uint256 maxP);
+    event LogEditMinParticipation(uint256 minP);
+    event LogGrantATier(address user, uint256 tier);
+    event LogChangeSaleOwner(address newOwner);
     
+
     constructor(
-        address _admin, 
-        uint256 _serviceFee, 
-        address _feeAddr, 
-        uint256 _minParticipation, 
-        uint256 _maxParticipation){
-        require(_admin != address(0), "Address zero validation");
-        require(_feeAddr != address(0), "Address zero validation");
-        admin = IAdmin2(_admin);
-        serviceFee = _serviceFee;
+        address [] memory setupAddys,
+        uint256 [] memory uints,
+        address [] memory wlAddys,
+        uint256 [] memory tiers4WL,
+        uint256 [] memory startTimes,
+        address _feeAddr,
+        uint256 _serviceFee
+    ){
+        require(setupAddys[1] != address(0), "Address zero validation");
+        require(setupAddys[0] != address(0), "Address zero validation");
+        require(uints[2] >= 5100 && uints[2] <= 10000, "Min 51%, Max 100%");
+        require(uints[0] < uints[1], "Max participation should be greater than min participation");
+        IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
+        defaultDexRouter = _dexRouter;
+        IERC20 _erc20 = IERC20(setupAddys[4]);
+        tokenERC20 = _erc20;
+        tokenERC20decimals = IERC20Metadata(setupAddys[4]).decimals();
+        admin = IAdmin(setupAddys[1]);
         feeAddr = _feeAddr;
-        minParticipation = _minParticipation;
-        maxParticipation = _maxParticipation;
+        serviceFee = _serviceFee;
+        minParticipation = uints[0];
+        maxParticipation = uints[1];
+        lpPercentage = uints[2];
+        pcsListingRate = uints[3];
+        liquidityLockPeriod = uints[4];
+        factory = msg.sender;
+        setSaleParams(setupAddys[2],setupAddys[3],uints[5],uints[6],uints[7],uints[8],uints[9],uints[10]);
+        grantATierMultiply(wlAddys, tiers4WL);
+        setRounds(startTimes);     
     }
 
+    
     /// @notice     Admin function to set sale parameters
     function setSaleParams(
-        address _saleToken,
+        address _token,
         address _saleOwner,
-        uint256 _saleTokenPriceInERC20,
+        uint256 _tokenPriceInERC20,
         uint256 _saleEnd,
         uint256 _saleStart,
         uint256 _publicRoundStartDelta,
         uint256 _hardCap,
-        uint256 _softCap,
-        address _tokenERC20
+        uint256 _softCap
     )
-        external
-        onlyAdmin
+        private
     {
         require(!sale.isCreated, "Sale already created.");
-        require(_saleToken != address(0), "setSaleParams: Token address can not be 0.");
+        require(_token != address(0), "setSaleParams: Token address can not be 0.");
         require(
             _saleOwner != address(0),
             "Invalid sale owner address."
         );
         require(
-            _tokenERC20 != address(0),
-            "Invalid address."
-        );
-        require(
-            _saleTokenPriceInERC20 != 0 &&
+            _tokenPriceInERC20 != 0 &&
             _hardCap != 0 &&
             _softCap != 0 &&
             _saleEnd > block.timestamp,
@@ -165,50 +214,80 @@ contract SparklaunchSaleERC20 {
         require(_saleEnd <= block.timestamp + 8640000, "Max sale duration is 100 days");
         require(_saleStart >= block.timestamp, "Sale start should be in the future");
         require(_saleStart < _saleEnd, "Sale start should be before sale end");
-        
 
+        decimals = IERC20Metadata(_token).decimals();
+        
         // Set params
-        sale.saleToken = IERC20(_saleToken);
+        sale.token = IERC20(_token);
         sale.isCreated = true;
         sale.saleOwner = _saleOwner;
-        sale.saleTokenPriceInERC20 = _saleTokenPriceInERC20;
+        sale.tokenPriceInERC20 = _tokenPriceInERC20;
         sale.saleEnd = _saleEnd;
         sale.hardCap = _hardCap;
         sale.softCap = _softCap;
-        tokenERC20 = _tokenERC20;
         publicRoundStartDelta = _publicRoundStartDelta;
         saleStartTime = _saleStart;
-    
+
 
         // Emit event
         emit SaleCreated(
             sale.saleOwner,
-            sale.saleTokenPriceInERC20,
+            sale.tokenPriceInERC20,
             sale.saleEnd,
             sale.hardCap,
-            sale.softCap,
-            tokenERC20
+            sale.softCap
         );
     }
 
-    function grantATierMultiply(address[] memory addys, uint256[] memory tiers) external onlyAdmin {
+    function changeLpPercentage(uint256 _lpPercentage) external onlySaleOwner{
+        require(_lpPercentage >= 5100 && _lpPercentage <= 10000, "Min 51%, Max 100%");
+        require(block.timestamp < saleStartTime, "Sale already started");
+        lpPercentage = _lpPercentage;
+        emit LogChangeLpPercentage(_lpPercentage);
+    }
+
+    function changeSaleOwner(address _saleOwner) external onlySaleOwner{
+        require(block.timestamp < saleStartTime, "Sale already started");
+        require(_saleOwner != sale.saleOwner, "Already set to this value");
+        require(_saleOwner != address(0), "Address 0 validation");
+        sale.saleOwner = _saleOwner;
+        emit LogChangeSaleOwner(_saleOwner);
+    }
+
+    function grantATierMultiply4SaleOwner(address[] memory addys, uint256[] memory tiers) external onlySaleOwner {
+        require(block.timestamp < saleStartTime, "Sale already started");
         require(addys.length == tiers.length, "Invalid input");
         for (uint256 i = 0; i < addys.length; i++){
             grantATier(addys[i], tiers[i]);
         }
     }
 
-    function grantATier(address user, uint256 _tier) public onlyAdmin {
+    function grantATierMultiply(address[] memory addys, uint256[] memory tiers) private {
+        require(block.timestamp < saleStartTime, "Sale already started");
+        require(addys.length == tiers.length, "Invalid input");
+        for (uint256 i = 0; i < addys.length; i++){
+            grantATier(addys[i], tiers[i]);
+        }
+    }
+
+    function grantATier(address user, uint256 _tier) private {
         require(_tier <= 5, "Max tier is 5");
         require(_tier != 0, "Tier can't be 0");
         require(user != address(0), "Zero address validation");
         tier[user] = _tier;
+        emit LogGrantATier(user, _tier);
     }
 
-    // Function for owner to deposit saleTokens, can be called only once.
-    function depositSaleTokens()
-        external
-        onlySaleOwner
+    function calculateMaxTokensForLiquidity() public view returns(uint256){
+        uint256 maxERC20Amount = (sale.hardCap * sale.tokenPriceInERC20)/ 10**decimals;
+        uint256 _tokensAmountForLiquidity = (maxERC20Amount * pcsListingRate)/ 10**tokenERC20decimals;
+        return(_tokensAmountForLiquidity);
+    }
+
+    // Function for owner to deposit tokens, can be called only once.
+    function depositTokens()
+        external 
+        onlyFactory
     {
         // Require that setSaleParams was called
         require(
@@ -216,55 +295,62 @@ contract SparklaunchSaleERC20 {
             "Sale parameters not set."
         );
 
-        // Require that saleTokens are not deposited
+        // Require that tokens are not deposited
         require(
-            !sale.saleTokensDeposited,
+            !sale.tokensDeposited,
             "Tokens already deposited."
         );
 
-        // Mark that saleTokens are deposited
-        sale.saleTokensDeposited = true;
+        // Mark that tokens are deposited
+        sale.tokensDeposited = true;
+
+        uint256 lpTokens = calculateMaxTokensForLiquidity();
+
+        uint256 amount = sale.hardCap.add(lpTokens);
 
         // Perform safe transfer
-        sale.saleToken.transferFrom(
+        sale.token.transferFrom(
             msg.sender,
             address(this),
-            sale.hardCap
+            amount
         );
     }
 
+   
     // Participate function for manual participation
     function participate(
-        uint256 amountERC20,
-        uint256 tierId
+        uint256 tierId,
+        uint256 amountERC20
     ) external {
-        require(tierId != 0 && tierId <= 5, "Invalid tier id");
+        require(tierId <= 5, "Invalid tier id");
         require(amountERC20 >= minParticipation, "Amount should be greater than minParticipation");
         require(amountERC20 <= maxParticipation, "Amount should be not greater than maxParticipation");
-
-        _participate(msg.sender,amountERC20, tierId);
+        _participate(msg.sender, amountERC20, tierId);
     }
-
+ 
+    
     // Function to participate in the sales
     function _participate(
         address user,
         uint256 amountERC20, 
         uint256 _tierId
-    ) internal {
-
+    ) private {
+       ///Check user haven't participated before
        require(!isParticipated[user], "Already participated.");
        require(tier[user] == _tierId, "Wrong Round");
+       require(block.timestamp >= saleStartTime, "Sale haven't started yet");
        require(block.timestamp >= tierIdToTierStartTime[_tierId], "Your round haven't started yet");
        if(_tierId == 0){
            require(block.timestamp >= tierIdToTierStartTime[5] + publicRoundStartDelta);
        }
-       require(sale.saleTokensDeposited == true, "Sale tokens were not deposited");
+       require(sale.tokensDeposited == true, "Sale tokens were not deposited");
+       require(block.timestamp <= sale.saleEnd, "Sale finished");
        require(IERC20(tokenERC20).allowance(user, address(this)) >= amountERC20, "Insuficcient allowance");
-       console.log(IERC20(tokenERC20).allowance(user, address(this)), "Allowance");
-       console.log(amountERC20, "amount");
-        // Compute the amount of saleTokens user is buying
-        uint256 amountOfTokensBuying = 
-            (amountERC20).mul(uint(10) ** IERC20Metadata(address(sale.saleToken)).decimals()).div(sale.saleTokenPriceInERC20);
+    
+
+        // Compute the amount of tokens user is buying
+        uint256 amountOfTokensBuying =
+            (amountERC20).mul(uint(10) ** IERC20Metadata(address(sale.token)).decimals()).div(sale.tokenPriceInERC20);
 
         // Must buy more than 0 tokens
         require(amountOfTokensBuying > 0, "Can't buy 0 tokens");
@@ -272,12 +358,12 @@ contract SparklaunchSaleERC20 {
 
         // Require that amountOfTokensBuying is less than sale token leftover cap
         require(
-            amountOfTokensBuying <= sale.hardCap.sub(sale.totalSaleTokensSold),
+            amountOfTokensBuying <= sale.hardCap.sub(sale.totalTokensSold),
             "Not enough tokens to sell."
         );
 
         // Increase amount of sold tokens
-        sale.totalSaleTokensSold = sale.totalSaleTokensSold.add(amountOfTokensBuying);
+        sale.totalTokensSold = sale.totalTokensSold.add(amountOfTokensBuying);
 
         // Increase amount of ERC20 raised
         sale.totalERC20Raised = sale.totalERC20Raised.add(amountERC20);
@@ -287,7 +373,8 @@ contract SparklaunchSaleERC20 {
             amountBought: amountOfTokensBuying,
             amountERC20Paid: amountERC20,
             tierId: _tierId,
-            areTokensWithdrawn: false
+            areTokensWithdrawn: false,
+            areERC20sWithdrawn: false
         });
 
         // Add participation for user.
@@ -296,6 +383,7 @@ contract SparklaunchSaleERC20 {
         isParticipated[user] = true;
         // Increment number of participants in the Sale.
         numberOfParticipants++;
+
         // Transfer tokens 
         bool success = IERC20(tokenERC20).transferFrom(user, address(this), amountERC20);
         require(success);
@@ -303,12 +391,11 @@ contract SparklaunchSaleERC20 {
         emit TokensSold(user, amountOfTokensBuying);
     }
 
-
-    // Expose function where user can withdraw multiple unlocked portions at once.
+    // Expose function where user can withdraw sale tokens.
     function withdraw() external {
         require(block.timestamp > sale.saleEnd, "Sale is running");
         require(saleFinished == true && isSaleSuccessful == true, "Sale was cancelled");
-        uint256 totalToWithdraw = 0;
+        require(isParticipated[msg.sender], "User is not a participant.");
 
         // Retrieve participation from storage
         Participation storage p = userToParticipation[msg.sender];
@@ -316,71 +403,110 @@ contract SparklaunchSaleERC20 {
         require(p.areTokensWithdrawn == false, "Already withdrawn");
 
         uint256 amountWithdrawing = p.amountBought;
-        totalToWithdraw = totalToWithdraw.add(amountWithdrawing);
+        
 
         p.areTokensWithdrawn = true;
 
-        if(totalToWithdraw > 0) {
+
+        if(amountWithdrawing > 0) {
             // Transfer tokens to user
-            sale.saleToken.transfer(msg.sender, totalToWithdraw);
+            sale.token.transfer(msg.sender, amountWithdrawing);
             // Trigger an event
-            emit TokensWithdrawn(msg.sender, totalToWithdraw);
+            emit TokensWithdrawn(msg.sender, amountWithdrawing);
         }
     }
 
-    function editMaxAndMinParticipation(uint256 _maxP, uint256 _minP) external onlyAdmin{
+    function editMaxParticipation(uint256 _maxP) external onlySaleOwner{
         require(block.timestamp < saleStartTime, "Sale already started");
-        minParticipation = _minP;
         maxParticipation = _maxP;
+        emit LogEditMaxParticipation(_maxP);
     }
 
-    function finishSale() public onlyAdmin{
+    function editMinParticipation(uint256 _minP) external onlySaleOwner{
+        require(block.timestamp < saleStartTime, "Sale already started");
+        minParticipation = _minP;
+        emit LogEditMaxParticipation(_minP);
+    }
+   
+    function finishSale() external onlySaleOwnerOrAdmin{
         require(block.timestamp >= sale.saleEnd, "Sale is not finished yet");
-        if(sale.totalERC20Raised >= sale.softCap){
+        require(saleFinished == false, "The function can be called only once");
+        if(sale.totalTokensSold >= sale.softCap){
+            ERC20AmountForLiquidity = (sale.totalERC20Raised * lpPercentage) / 10000;
+            tokensAmountForLiquidity = (ERC20AmountForLiquidity * pcsListingRate) / 10**18;
             isSaleSuccessful = true;
             saleFinished = true;
+            addLiquidity(tokensAmountForLiquidity, ERC20AmountForLiquidity);
+            lockLiquidity();
+            burnTokens();
         } else{
             isSaleSuccessful = false;
             saleFinished = true;
+            withdrawLeftoverIfSaleCancelled();
         }
         emit LogFinishSale(isSaleSuccessful);
     }
 
+    function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
+        // approve token transfer to cover all possible scenarios
+        sale.token.approve(address(defaultDexRouter), tokenAmount);
+        tokenERC20.approve(address(defaultDexRouter), ethAmount);
+        // add the liquidity
+        defaultDexRouter.addLiquidity(
+            address(sale.token),
+            address(tokenERC20),
+            tokenAmount,
+            ethAmount,
+            0, // slippage is unavoidable
+            0, // slippage is unavoidable
+            address(this),
+            block.timestamp + 60
+        );
+    }
+
+    function lockLiquidity() private {
+        liquidityUnlockTime = block.timestamp + liquidityLockPeriod;
+        address _defaultPair = IDEXFactory(defaultDexRouter.factory()).getPair(address(sale.token), address(tokenERC20));
+        defaultPair = IDEXPair(_defaultPair);
+        emit LogLockLiquidity(block.timestamp, liquidityUnlockTime);
+    }
+
+    function withdrawLP() external onlySaleOwner{
+        require(block.timestamp >= liquidityUnlockTime);
+        require(lpWithdrawn != true, "Already withdrawn");
+        uint256 amount = defaultPair.balanceOf(address(this));
+        lpWithdrawn = true;
+        defaultPair.transfer(sale.saleOwner, amount);
+        emit LogWithdrawLP(amount);
+    }
+    
+    // transfers ERC20 correctly
     function withdrawUserFundsIfSaleCancelled() external{
         require(saleFinished == true && isSaleSuccessful == false, "Sale wasn't cancelled.");
         require(isParticipated[msg.sender], "Did not participate.");
         require(block.timestamp >= sale.saleEnd, "Sale running");
         // Retrieve participation from storage
         Participation storage p = userToParticipation[msg.sender];
+        require(p.areERC20sWithdrawn == false, "Already withdrawn");
+        p.areERC20sWithdrawn = true;
         uint256 amountERC20Withdrawing = p.amountERC20Paid;
-        safeTransferERC20(msg.sender, amountERC20Withdrawing);
+        // Transfer tokens 
+        bool success = IERC20(tokenERC20).transfer(msg.sender, amountERC20Withdrawing);
+        require(success);
         emit LogwithdrawUserFundsIfSaleCancelled(msg.sender, amountERC20Withdrawing);
     }
 
-    function withdrawDepositedTokensIfSaleCancelled() external onlySaleOwner{
-        require(saleFinished == true && isSaleSuccessful == false, "Sale wasn't cancelled");
-        require(block.timestamp >= sale.saleEnd, "Sale running");
-        require(saleCancelledTokensWithdrawn == false, "Already withdrawn");
-        require(sale.saleTokensDeposited == true, "Tokens were not deposited.");
-        saleCancelledTokensWithdrawn = true;
-        // Perform safe transfer
-        sale.saleToken.transfer(
-            msg.sender,
-            sale.hardCap 
-        );
-        emit LogWithdrawDepositedTokensIfSaleCancelled(msg.sender, sale.hardCap);
-    }
 
-    // Internal function to handle safe transfer
-    function safeTransferERC20(address to, uint256 value) internal {
-        (bool success) = IERC20(tokenERC20).transfer(to, value);
-        require(success);
-    }
-
-    // Function to withdraw all the earnings and the leftover of the sale contract.
-    function withdrawEarningsAndLeftover() external onlySaleOwner {
-        withdrawEarningsInternal();
-        withdrawLeftoverInternal();
+    function burnTokens() private {
+        uint256 all = sale.token.balanceOf(address(this));
+        uint256 need = sale.totalTokensSold;
+        uint256 amountToBurn = all.sub(need);
+        if(amountToBurn > 0){
+            sale.token.transfer(
+            dead,
+            amountToBurn);
+        }
+        emit LogBurn(amountToBurn);
     }
 
     // Function to withdraw only earnings
@@ -388,57 +514,46 @@ contract SparklaunchSaleERC20 {
         withdrawEarningsInternal();
     }
 
-    // Function to withdraw only leftover
-    function withdrawLeftover() external onlySaleOwner {
-        withdrawLeftoverInternal();
-    }
 
     // Function to withdraw earnings
-    function withdrawEarningsInternal() internal  {
+    function withdrawEarningsInternal() private  {
         require(saleFinished == true && isSaleSuccessful == true, "Sale was cancelled");
         // Make sure sale ended
         require(block.timestamp >= sale.saleEnd,"Sale Running");
 
         // Make sure owner can't withdraw twice
-        require(!sale.earningsWithdrawn,"Can't withdraw twice");
+        require(!sale.earningsWithdrawn,"can't withdraw twice");
         sale.earningsWithdrawn = true;
+
         // Earnings amount of the owner in ERC20
-        uint256 totalProfit = sale.totalERC20Raised;
+        uint256 totalProfit = sale.totalERC20Raised.sub(ERC20AmountForLiquidity);
         uint256 totalFee = _calculateServiceFee(totalProfit);
         uint256 saleOwnerProfit = totalProfit.sub(totalFee);
 
-        safeTransferERC20(msg.sender, saleOwnerProfit);
-        safeTransferERC20(feeAddr, totalFee);
+        // Transfer tokens 
+        bool success = IERC20(tokenERC20).transfer(msg.sender, saleOwnerProfit);
+        require(success);
+        bool success2 = IERC20(tokenERC20).transfer(feeAddr, totalFee);
+        require(success2);
     }
 
-    // Function to withdraw leftover
-    function withdrawLeftoverInternal() internal {
-        require(saleFinished == true && isSaleSuccessful == true, "Sale wasn cancelled");
+
+    function withdrawLeftoverIfSaleCancelled() private {
+        require(saleFinished == true && isSaleSuccessful == false, "Sale wasnt cancelled");
         // Make sure sale ended
         require(block.timestamp >= sale.saleEnd);
 
         // Make sure owner can't withdraw twice
-        require(!sale.leftoverWithdrawn,"can't withdraw twice");
-        sale.leftoverWithdrawn = true;
+        require(!leftoverWithdrawnCancelledSale, "can't withdraw twice");
+        leftoverWithdrawnCancelledSale = true;
 
-        // Amount of saleTokens which are not sold
-        uint256 leftover = sale.hardCap.sub(sale.totalSaleTokensSold);
+        // Amount of tokens which are not sold
+        uint256 leftover = sale.token.balanceOf(address(this));
+    
 
         if (leftover > 0) {
-            sale.saleToken.transfer(msg.sender, leftover);
+            sale.token.transfer(msg.sender, leftover);
         }
-    }
-
-    // Function where admin can withdraw all unused funds.
-    function withdrawUnusedFunds() external onlyAdmin {
-        uint256 balanceERC20 = IERC20(tokenERC20).balanceOf(address(this));
-
-        uint256 totalReservedForRaise = sale.earningsWithdrawn ? 0 : sale.totalERC20Raised;
-
-        safeTransferERC20(
-            msg.sender,
-            balanceERC20.sub(totalReservedForRaise)
-        );
     }
 
     /// @notice     Function to get participation for passed user address
@@ -449,6 +564,7 @@ contract SparklaunchSaleERC20 {
             uint256,
             uint256,
             uint256,
+            bool,
             bool
         )
     {
@@ -457,7 +573,8 @@ contract SparklaunchSaleERC20 {
             p.amountBought,
             p.amountERC20Paid,
             p.tierId,
-            p.areTokensWithdrawn
+            p.areTokensWithdrawn,
+            p.areERC20sWithdrawn
         );
     }
 
@@ -470,17 +587,31 @@ contract SparklaunchSaleERC20 {
         onlyAdmin
     {
         // Require that token address does not match with sale token
-        require(token != address(sale.saleToken), "Can't withdraw sale token.");
+        require(token != address(sale.token), "Can't withdraw sale token.");
+        require(token != address(defaultPair), "Can't withdraw sale lps.");
+        require(token != address(tokenERC20), "Can't withdraw sale earnings.");
         // Safe transfer token from sale contract to beneficiary
         IERC20(token).transfer(beneficiary, IERC20(token).balanceOf(address(this)));
     }
 
+    function _calculateServiceFee(uint256 _amount)
+        private
+        view
+        returns (uint256)
+    {
+
+        return _amount.mul(serviceFee).div(10**4);
+    }
+
+    function getNumberOfRegisteredUsers() external view returns(uint256) {
+        return numberOfParticipants;
+    }
+
     /// @notice     Setting rounds for sale.
     function setRounds(
-        uint256[] calldata startTimes
+        uint256[] memory startTimes
     )
-        external
-        onlyAdmin
+        private
     {
         require(sale.isCreated);
         require(tierIds.length == 0, "Rounds set already.");
@@ -533,19 +664,6 @@ contract SparklaunchSaleERC20 {
         return tierIds[i];
     }
 
-    function getNumberOfRegisteredUsers() external view returns(uint256) {
-        return numberOfParticipants;
-    }
-
-    function _calculateServiceFee(uint256 _amount)
-        public
-        view
-        returns (uint256)
-    {
-
-        return _amount.mul(serviceFee).div(10**4);
-    }
-
-    // Function to act as a fallback and handle receiving BNB.
+    // Function to act as a fallback and handle receiving ERC20.
     receive() external payable {}
 }

@@ -10,13 +10,13 @@ task("getSale", "deploys sale")
     const signer = new ethers.Wallet(PRIVATE_KEY, provider); 
 
 
-    const SALE_ADDRESS = "0x38DbF90fce47a99C7390A7C18e9bb8f673366f0D";  
+    const SALE_ADDRESS = "0x6c8199e6d61b3ad102f7a2d682c2dda041606c85";  
 
 
     const saleContract = new ethers.Contract(SALE_ADDRESS, sale.abi, signer);
     
 
-    const tx = await saleContract.liquidityUnlockTime();
+    const tx = await saleContract.sale();
     
     console.log(tx);
 

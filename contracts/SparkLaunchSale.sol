@@ -160,22 +160,21 @@ contract SparklaunchSale {
         uint256 _serviceFee
     ){
         require(setupAddys[1] != address(0), "Address zero validation");
-        require(setupAddys[2] != address(0), "Address zero validation");
         require(setupAddys[0] != address(0), "Address zero validation");
-        require(uints[3] >= 5100 && uints[3] <= 10000, "Min 51%, Max 100%");
-        require(uints[1] < uints[2], "Max participation should be greater than min participation");
+        require(uints[2] >= 5100 && uints[2] <= 10000, "Min 51%, Max 100%");
+        require(uints[0] < uints[1], "Max participation should be greater than min participation");
         IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
         defaultDexRouter = _dexRouter;
         admin = IAdmin(setupAddys[1]);
         feeAddr = _feeAddr;
         serviceFee = _serviceFee;
-        minParticipation = uints[1];
-        maxParticipation = uints[2];
-        lpPercentage = uints[3];
-        pcsListingRate = uints[4];
-        liquidityLockPeriod = uints[5];
+        minParticipation = uints[0];
+        maxParticipation = uints[1];
+        lpPercentage = uints[2];
+        pcsListingRate = uints[3];
+        liquidityLockPeriod = uints[4];
         factory = msg.sender;
-        setSaleParams(setupAddys[3],setupAddys[4],uints[6],uints[7],uints[8],uints[9],uints[10],uints[11]);
+        setSaleParams(setupAddys[2],setupAddys[3],uints[5],uints[6],uints[7],uints[8],uints[9],uints[10]);
         grantATierMultiply(wlAddys, tiers4WL);
         setRounds(startTimes);     
     }

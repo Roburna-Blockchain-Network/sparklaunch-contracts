@@ -25,22 +25,38 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://bsc-dataseed4.binance.org/",
+        url: "https://bsc-dataseed2.binance.org/",
       },
       allowUnlimitedContractSize: true
     },
 
-    binance: {
-      url: `https://bsc-dataseed4.ninicoin.io/`,
-      accounts: [`d32df9466aad3f3ec1b3485cfed0d185df4a453d2c89a22b867ba1cdece2b8fa`],
+    roburna: {
+      url: "https://preseed-testnet-1.roburna.com/",
+      accounts:['a3a9bfa1e100ae81cf6b03083f4a96f87f9ede36ef6931d8291eed4a8c5a447d'],
       allowUnlimitedContractSize: true
-    },
+   },
+
+   binance: {
+    url: "https://preseed-testnet-1.roburna.com/",
+    accounts:['a3a9bfa1e100ae81cf6b03083f4a96f87f9ede36ef6931d8291eed4a8c5a447d'],
+    allowUnlimitedContractSize: true
+   },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
   },
   etherscan: {
-    apiKey: "MMTH9PCYDD18ZYA6TKHA51TUKEJ536C33P",
+    apiKey: "b3f2c110990b3e5943b007e5fd651b69e4553daa005077f94dff129f7b30d550",
+    customChains: [
+      {
+        network: "roburna",
+        chainId: 159,
+        urls: {
+          apiURL: "https://testapi.rbascan.com/api/",
+          browserURL: "https://testapi.rbascan.com/"
+        }
+      }
+    ]
   },
 };
