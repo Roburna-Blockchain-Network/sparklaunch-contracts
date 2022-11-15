@@ -158,9 +158,8 @@ contract SparklaunchSale {
         uint256 _serviceFee,
         bool _isPublic
     ) {
-        require(setupAddys[1] != address(0), "Address zero validation");
-        require(setupAddys[2] != address(0), "Address zero validation");
         require(setupAddys[0] != address(0), "Address zero validation");
+        require(setupAddys[1] != address(0), "Address zero validation");
         require(uints[3] >= 5100 && uints[3] <= 10000, "Min 51%, Max 100%");
         require(
             uints[1] < uints[2],
@@ -178,8 +177,8 @@ contract SparklaunchSale {
         liquidityLockPeriod = uints[5];
         factory = msg.sender;
         setSaleParams(
+            setupAddys[2],
             setupAddys[3],
-            setupAddys[4],
             uints[6],
             uints[7],
             uints[8],

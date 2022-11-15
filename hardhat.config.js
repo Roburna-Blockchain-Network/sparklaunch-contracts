@@ -38,7 +38,7 @@ module.exports = {
       allowUnlimitedContractSize: true,
     },
     roburna: {
-      url: `https://preseed-testnet-1.roburna.com/`,
+      url: "https://preseed-testnet-1.roburna.com/",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       allowUnlimitedContractSize: true,
@@ -49,6 +49,16 @@ module.exports = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: "MMTH9PCYDD18ZYA6TKHA51TUKEJ536C33P",
+    apiKey: "b3f2c110990b3e5943b007e5fd651b69e4553daa005077f94dff129f7b30d550",
+    customChains: [
+      {
+        network: "roburna",
+        chainId: 159,
+        urls: {
+          apiURL: "https://testapi.rbascan.com/api/",
+          browserURL: "https://testapi.rbascan.com/",
+        },
+      },
+    ],
   },
 };
