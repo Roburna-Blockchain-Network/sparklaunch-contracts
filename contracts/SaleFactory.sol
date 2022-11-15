@@ -75,7 +75,7 @@ contract SalesFactory is Ownable{
         address [] memory wlAddys,
         uint256 [] memory tiers4WL,
         uint256 [] memory startTimes,
-        uint256 id)
+        bool isPublic)
     external 
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
@@ -99,13 +99,13 @@ contract SalesFactory is Ownable{
             tiers4WL,
             startTimes,
             feeAddr,
-            serviceFee
+            serviceFee,
+            isPublic
         );
 
         IERC20(setupAddys[3]).approve(address(sale), amount);
         sale.depositTokens();
-
-        require(saleIdToAddress[id] == address(0), "Id already used");
+        uint256 id = allSales.length;
         saleIdToAddress[id] = address(sale);
         saleAddressToSaleOwner[address(sale)] = msg.sender;
 
