@@ -8,18 +8,42 @@ const ADMIN_ADDRESS = [
 ];
 
 async function main() {
-  const AdminContract = await ethers.getContractFactory("Admin");
-  const FactoryContract = await ethers.getContractFactory("SalesFactory");
+  // const AdminContract = await ethers.getContractFactory("Admin");
+  // const FactoryContract = await ethers.getContractFactory("SalesFactory");
 
-  const adminContract = await AdminContract.deploy(ADMIN_ADDRESS);
+  // const adminContract = await AdminContract.deploy(ADMIN_ADDRESS);
 
-  await adminContract.deployed();
-  console.log("adminContract deployed to:", adminContract.address);
+  // await adminContract.deployed();
+  // console.log("adminContract deployed to:", adminContract.address);
 
-  const factoryContract = await FactoryContract.deploy(adminContract.address);
-  await factoryContract.deployed();
+  // try {
+  //   await hre.run("verify", {
+  //     address: adminContract.address,
+  //     constructorArgsParams: [ADMIN_ADDRESS],
+  //   });
+  // } catch (error) {
+  //   console.error(error);
+  //   console.log(
+  //     `Smart contract at address ${adminContract.address} is already verified`
+  //   );
+  // }
 
-  console.log("factoryContract deployed to:", factoryContract.address);
+  // const factoryContract = await FactoryContract.deploy(adminContract.address);
+  // await factoryContract.deployed();
+
+  try {
+    await hre.run("verify", {
+      address: "0x0Ce8fF4ff0fa1C37deC51c46FbC06F9C9e2079e2",
+      constructorArgsParams: ["0xa78aefa96c0aa49ce2ad1c9a6cb88ac0eae49363"],
+    });
+  } catch (error) {
+    console.error(error);
+    console.log(
+      `Smart contract at address 0x0Ce8fF4ff0fa1C37deC51c46FbC06F9C9e2079e2 is already verified`
+    );
+  }
+
+  // console.log("factoryContract deployed to:", factoryContract.address);
 }
 
 main().catch((error) => {

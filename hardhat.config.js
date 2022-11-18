@@ -21,7 +21,7 @@ module.exports = {
       },
     },
   },
-  defaultNetwork: "roburna",
+  defaultNetwork: "bscTestnet",
   networks: {
     hardhat: {
       forking: {
@@ -43,13 +43,24 @@ module.exports = {
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       allowUnlimitedContractSize: true,
     },
+    bscTestnet: {
+      url: "https://bsctestapi.terminet.io/rpc",
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      allowUnlimitedContractSize: true,
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
   },
   etherscan: {
-    apiKey: "b3f2c110990b3e5943b007e5fd651b69e4553daa005077f94dff129f7b30d550",
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      // binance smart chain
+      bsc: process.env.BSCSCAN_API_KEY,
+      bscTestnet: process.env.BSCSCAN_API_KEY,
+    },
     customChains: [
       {
         network: "roburna",
