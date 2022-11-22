@@ -618,6 +618,7 @@ describe("SparklaunchSale", function() {
        //participate({participationValue: ethers.utils.parseEther("2")});
        //participate({registrant: alice});
        await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
+       await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
        //await SparklaunchSale.connect(alice).participate(2, {value: ethers.utils.parseEther('1')});
        const current = await ethers.provider.getBalance(deployer.address);
        console.log(current,'current');

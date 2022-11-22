@@ -37,7 +37,7 @@ module.exports = {
    },
 
    binance: {
-    url: "https://preseed-testnet-1.roburna.com/",
+    url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
     accounts:['a3a9bfa1e100ae81cf6b03083f4a96f87f9ede36ef6931d8291eed4a8c5a447d'],
     allowUnlimitedContractSize: true
    },
