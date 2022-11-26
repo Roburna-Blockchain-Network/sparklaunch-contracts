@@ -36,11 +36,11 @@ describe("SparklaunchSale", function() {
   const lpPerc = 5100;
   const pcsListingRate = ethers.utils.parseEther('200');
   const lpLockDelta = 100;
-  const TOKEN_PRICE_IN_BNB = ethers.utils.parseEther('0.002');
+  const TOKENS_4_1_BNB = ethers.utils.parseEther('400');
   const SALE_END_DELTA = 10000;
   const PUBLIC_ROUND_DELTA = 10;
-  const SOFT_CAP = ethers.utils.parseEther('500');
-  const HARD_CAP = ethers.utils.parseEther('1000');
+  const SOFT_CAP = ethers.utils.parseEther('1');
+  const HARD_CAP = ethers.utils.parseEther('5');
   const ROUNDS_START_DELTAS = [50, 70, 90, 100, 110];
 
 
@@ -99,13 +99,13 @@ describe("SparklaunchSale", function() {
     await SalesFactory.setFeeAddr(cedric.address);
     await SalesFactory.setServiceFee(100);
     await SalesFactory.deployNormalSale(
-      [router, Admin.address, cedric.address, SaleToken.address, deployer.address], 
-      [serviceFee, minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKEN_PRICE_IN_BNB, 
+      [router, Admin.address, SaleToken.address, deployer.address], 
+      [minP, maxP, lpPerc, pcsListingRate, lpLockDelta, TOKENS_4_1_BNB, 
        saleEnds, saleStarts, PUBLIC_ROUND_DELTA, HARD_CAP, SOFT_CAP],
       [deployer.address, alice.address, bob.address],
       [1, 2, 3],
       startTimes,
-      1);
+      false);
     const SparklaunchSaleFactory = await ethers.getContractFactory("SparklaunchSale");
     SparklaunchSale = SparklaunchSaleFactory.attach(await SalesFactory.allSales(0));
   });
@@ -603,26 +603,17 @@ describe("SparklaunchSale", function() {
         // Given
         this.provider = ethers.provider;
 
-       await SparklaunchSale.changeLpPercentage(10000);
+       await SparklaunchSale.changeLpPercentage(7000);
        
-       const tierA = await SparklaunchSale.tier(alice.address);
-       console.log(tierA,'tierA');
+    
        await ethers.provider.send("evm_increaseTime", [ROUNDS_START_DELTAS[2]]);
        await ethers.provider.send("evm_mine");
 
-       //await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
-       const previoussBalance = await ethers.provider.getBalance(deployer.address);
-       console.log(previoussBalance,'previoussBalance');
-       const previoussBalancea = await ethers.provider.getBalance(alice.address);
-       console.log(previoussBalancea,'previoussBalancea');
-       //participate({participationValue: ethers.utils.parseEther("2")});
-       //participate({registrant: alice});
-       await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('2')});
-       //await SparklaunchSale.connect(alice).participate(2, {value: ethers.utils.parseEther('1')});
-       const current = await ethers.provider.getBalance(deployer.address);
-       console.log(current,'current');
-       const currenta = await ethers.provider.getBalance(alice.address);
-       console.log(currenta,'currenta');
+       
+      //
+      // await SparklaunchSale.participate(1, {value: ethers.utils.parseEther('1')});
+      // await SparklaunchSale.connect(alice).participate(2, {value: ethers.utils.parseEther('2')});
+       await SparklaunchSale.connect(bob).participate(3, {value: ethers.utils.parseEther('0.05')});
 
        const dP = await SparklaunchSale.getParticipation(deployer.address);
        const aP = await SparklaunchSale.getParticipation(alice.address);
@@ -634,24 +625,29 @@ describe("SparklaunchSale", function() {
 
        const contractBalanceel = await ethers.provider.getBalance(SparklaunchSale.address);
        const contractBalancee2l = await ethers.utils.formatEther(contractBalanceel);
-       console.log(contractBalancee2l, 'contractBalancee2l');
+       console.log(contractBalancee2l, 'contract balance b4 finish sale');
+       const balanceb4Refund = await SaleToken.balanceOf(deployer.address);
+       const bobBalanceb4 = await ethers.provider.getBalance(bob.address);
        
-       //await SaleToken.connect(SparklaunchSale).approve("0x10ed43c718714eb63d5aa57b78b54704e256024e", ethers.utils.parseEther('300000'));
-       // When
        await SparklaunchSale.finishSale();
-       this.pairAddress = await SparklaunchSale.defaultPair()
-        console.log(this.pairAddress, "pair addr");
-        this.pair = new ethers.Contract(
-          this.pairAddress,
-          ['function totalSupply() external view returns (uint)','function balanceOf(address owner) external view returns (uint)','function approve(address spender, uint value) external returns (bool)','function decimals() external pure returns (uint8)','function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'],
-          this.provider
-        )
-        this.pairsigner =this.pair.connect(deployer) 
-        const BNBAmountForLiquidity = await SparklaunchSale.BNBAmountForLiquidity();
-        const BNBAmountForLiquidity2 = await ethers.utils.formatEther(BNBAmountForLiquidity);
-        console.log(BNBAmountForLiquidity2);
-       //const reserves =  await this.pair.getReserves();
-       //console.log(reserves);
+     //  this.pairAddress = await SparklaunchSale.defaultPair()
+     //   console.log(this.pairAddress, "pair addr");
+     //   this.pair = new ethers.Contract(
+     //     this.pairAddress,
+     //     ['function totalSupply() external view returns (uint)','function balanceOf(address owner) external view returns (uint)','function approve(address spender, uint value) external returns (bool)','function decimals() external pure returns (uint8)','function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)'],
+     //     this.provider
+     //   )
+     //   this.pairsigner =this.pair.connect(deployer) 
+       const BNBAmountForLiquidity = await SparklaunchSale.BNBAmountForLiquidity();
+       const TokensAmountForLiquidity = await SparklaunchSale.tokensAmountForLiquidity();
+       const BNBAmountForLiquidity2 = await ethers.utils.formatEther(BNBAmountForLiquidity);
+       const TokensAmountForLiquidity2 = await ethers.utils.formatEther(TokensAmountForLiquidity);
+       console.log(BNBAmountForLiquidity2, "BNB amount for liquidity");
+       console.log(TokensAmountForLiquidity2, "tokens amount for liquidity");
+
+     //  const reserves =  await this.pair.getReserves();
+     //  console.log(reserves, "reserves");
+
        const previousBalance = await ethers.provider.getBalance(deployer.address);
        const previousBalanceCedric = await ethers.provider.getBalance(cedric.address);
        const previousTokenBalance = await SaleToken.balanceOf(deployer.address);
@@ -662,18 +658,31 @@ describe("SparklaunchSale", function() {
        const sale = await SparklaunchSale.sale();
        console.log(parseInt(sale.hardCap), parseInt(sale.totalTokensSold)); 
        // When
-       await SparklaunchSale.withdrawEarnings(); 
-       await SparklaunchSale.withdrawLeftover(); 
+       //await SparklaunchSale.withdrawEarnings(); 
+      // await SparklaunchSale.connect(alice).withdraw(); 
+       await SparklaunchSale.connect(bob).withdrawUserFundsIfSaleCancelled();
+      // await SparklaunchSale.withdraw();
        // Then
        const currentBalance = await ethers.provider.getBalance(deployer.address);
        const currentBalanceCedric = await ethers.provider.getBalance(cedric.address);
        const contractBalance = await ethers.provider.getBalance(SparklaunchSale.address);
-       const currentTokenBalance = await SaleToken.balanceOf(deployer.address);
+       const bobBalance = await ethers.provider.getBalance(bob.address);
+       const currentTokenBalanceAlice = await SaleToken.balanceOf(alice.address);
+       const currentTokenBalanceBob = await SaleToken.balanceOf(bob.address);
        const contractTokenBalance = await SaleToken.balanceOf(SparklaunchSale.address);
-       console.log(previousBalance, 'previousBalance'); 
+
+       const balanceAfterRefund = await SaleToken.balanceOf(deployer.address);
+
+       console.log(previousBalance, 'deployer address'); 
+       console.log(balanceAfterRefund, 'balanceAfterRefund');
+       console.log(balanceb4Refund, 'balanceb4Refund');
        console.log(currentBalance, 'currentBalance'); 
-       console.log(previousBalanceCedric, 'previousBalanceCedric'); 
-       console.log(currentBalanceCedric, 'currentBalanceCedric');
+       console.log(currentTokenBalanceAlice, 'alice token balance after withdraw');
+       console.log(currentTokenBalanceBob, 'bob token balance after withdraw');
+       console.log(previousBalanceCedric, 'fee balance before finish'); 
+       console.log(contractBalance, 'contractBalance');
+       console.log(bobBalance, 'bobBalance');
+       console.log(bobBalanceb4, 'bobBalanceb4');
 
        expect(await SparklaunchSale.isSaleSuccessful()).to.be.true;
        expect(await SparklaunchSale.saleFinished()).to.be.true;

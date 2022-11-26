@@ -5,9 +5,9 @@ require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 // require("./scripts/deploySale.js");
-// require("./scripts/participate.js");
+ require("./scripts/participate.js");
 // require("./scripts/finishSale.js");
-// require("./scripts/getSale.js");
+ require("./scripts/getSale.js");
 // require("./scripts/withdrawLP.js");
 // require("./scripts/withdraw.js");
 
@@ -31,9 +31,9 @@ module.exports = {
     },
 
     binance: {
-      url: `https://bsc-dataseed4.ninicoin.io/`,
+      url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
       accounts: [
-        `d32df9466aad3f3ec1b3485cfed0d185df4a453d2c89a22b867ba1cdece2b8fa`,
+        `37c3f19a1bd53142c0e058ff3414200d58d4632a6f1a8d38c2a7967232357aeb`,
       ],
       allowUnlimitedContractSize: true,
     },

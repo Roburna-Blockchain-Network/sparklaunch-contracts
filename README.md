@@ -31,14 +31,14 @@ uints[] :
 1. min participation (with 18 decimals)
 2. max participation (with 18 decimals)
 3. lp percentage, from total of 10000, should be >= 5100 (51%) and <= 10000 (100%)
-4. dex listing rate (how much tokens for 1 bnb) with 18 decimals
+4. dex listing rate (how much tokens for 1 bnb) with  decimals
 5. lpLockDelta , lp lock period
-6. token price in bnb (wiith 18 decimals)
+6. tokens for 1 bnb (wiith token decimals)
 7. Sale end time (unix timestamp)
 8. Sale satrt time (unix timestamp)
 9. Public round start time delta. Public round start time calculates like : 5th tier start time + PublicRoundStartsDelta
-10. HardCap in tokens
-11. softCap in tokens
+10. HardCap in bnb
+11. softCap in bnb
 
 WLAddys[]:
 

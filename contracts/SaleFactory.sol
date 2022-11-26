@@ -4,6 +4,8 @@ pragma solidity ^0.8.6;
 import "./SparkLaunchSale.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import 'hardhat/console.sol';
+
 
 contract SalesFactory is Ownable {
     IAdmin public admin;
@@ -56,11 +58,11 @@ contract SalesFactory is Ownable {
 
     function calculateMaxTokensForLiquidity(
         uint256 hardCap,
-        uint256 tokenPriceInBNB,
+        uint256 tokensFor1BNB,
         uint256 pcsListingRate,
         uint8 decimals
     ) public pure returns (uint256) {
-        uint256 maxBNBAmount = (hardCap * tokenPriceInBNB) / 10**decimals;
+        uint256 maxBNBAmount = (hardCap * tokensFor1BNB) / 10**decimals;
         uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate) /
             10**18;
         return (_tokensAmountForLiquidity);
@@ -78,13 +80,15 @@ contract SalesFactory is Ownable {
         uint8 decimals = IERC20Metadata(setupAddys[2]).decimals();
 
         uint256 lpTokens = calculateMaxTokensForLiquidity(
-            uints[10],
-            uints[6],
-            uints[4],
+            uints[9],
+            uints[5],
+            uints[3],
             decimals
         );
-
-        uint256 amount = uints[10] + lpTokens;
+        
+        uint256 tokensToSell = (uints[9] * uints[5]) / 10**18;
+        uint256 amount = tokensToSell + lpTokens;
+        console.log(amount);
 
         IERC20(setupAddys[2]).transferFrom(
             setupAddys[3],
@@ -103,12 +107,16 @@ contract SalesFactory is Ownable {
             isPublic
         );
 
-        IERC20(setupAddys[2]).approve(address(sale), amount);
-        sale.depositTokens();
+        
         uint256 id = allSales.length;
         saleIdToAddress[id] = address(sale);
         saleAddressToSaleOwner[address(sale)] = msg.sender;
-
+        uint256 allow = IERC20(setupAddys[2]).allowance(address(this), address(sale));
+        console.log(allow);
+        IERC20(setupAddys[2]).approve(address(sale), amount);
+        uint256 allow2 = IERC20(setupAddys[2]).allowance(address(this), address(sale));
+        console.log(allow2);
+        sale.depositTokens();
         allSales.push(address(sale));
         feeAddr.transfer(msg.value);
 

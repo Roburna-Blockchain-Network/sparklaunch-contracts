@@ -5,18 +5,18 @@ const sale = require("../artifacts/contracts/SparkLaunchSale.sol/SparklaunchSale
 
 task("participate", "deploys sale")
   .setAction(async () => {
-    const PRIVATE_KEY = "d32df9466aad3f3ec1b3485cfed0d185df4a453d2c89a22b867ba1cdece2b8fa";
-    const provider = new ethers.providers.JsonRpcProvider("https://bsc-dataseed4.ninicoin.io/");
+    const PRIVATE_KEY = "a3a9bfa1e100ae81cf6b03083f4a96f87f9ede36ef6931d8291eed4a8c5a447d";
+    const provider = new ethers.providers.JsonRpcProvider("https://preseed-testnet-1.roburna.com/");
     const signer = new ethers.Wallet(PRIVATE_KEY, provider); 
 
 
-    const SALE_ADDRESS = "0x38DbF90fce47a99C7390A7C18e9bb8f673366f0D";  
+    const SALE_ADDRESS = "0x425d87621bA3b2dD9f53E1837A779c3c831Bec12";  
 
 
     const saleContract = new ethers.Contract(SALE_ADDRESS, sale.abi, signer);
     
 
-    const tx = await saleContract.participate(1, {value: ethers.utils.parseEther("0.00005")});
+    const tx = await saleContract.participate(0, {value: ethers.utils.parseEther("2")});
     
     console.log(tx);
 

@@ -55,7 +55,7 @@ contract SparklaunchSale {
         // Address of sale owner
         address saleOwner; //+
         // Price of the token quoted in BNB
-        uint256 tokenPriceInBNB;
+        uint256 tokensFor1BNB;
         // Total tokens being sold
         uint256 totalTokensSold;
         // Total BNB Raised
@@ -131,7 +131,7 @@ contract SparklaunchSale {
     event TokensWithdrawn(address user, uint256 amount);
     event SaleCreated(
         address saleOwner,
-        uint256 tokenPriceInBNB,
+        uint256 tokensFor1BNB,
         uint256 saleEnd,
         uint256 _hardCap,
         uint256 _softCap
@@ -160,9 +160,9 @@ contract SparklaunchSale {
     ) {
         require(setupAddys[0] != address(0), "Address zero validation");
         require(setupAddys[1] != address(0), "Address zero validation");
-        require(uints[3] >= 5100 && uints[3] <= 10000, "Min 51%, Max 100%");
+        require(uints[2] >= 5100 && uints[2] <= 10000, "Min 51%, Max 100%");
         require(
-            uints[1] < uints[2],
+            uints[0] < uints[1],
             "Max participation should be greater than min participation"
         );
         IDEXRouter _dexRouter = IDEXRouter(setupAddys[0]);
@@ -170,21 +170,21 @@ contract SparklaunchSale {
         admin = IAdmin(setupAddys[1]);
         feeAddr = _feeAddr;
         serviceFee = _serviceFee;
-        minParticipation = uints[1];
-        maxParticipation = uints[2];
-        lpPercentage = uints[3];
-        pcsListingRate = uints[4];
-        liquidityLockPeriod = uints[5];
+        minParticipation = uints[0];
+        maxParticipation = uints[1];
+        lpPercentage = uints[2];
+        pcsListingRate = uints[3];
+        liquidityLockPeriod = uints[4];
         factory = msg.sender;
         setSaleParams(
             setupAddys[2],
             setupAddys[3],
+            uints[5],
             uints[6],
             uints[7],
             uints[8],
             uints[9],
             uints[10],
-            uints[11],
             _isPublic
         );
         grantATierMultiply(wlAddys, tiers4WL);
@@ -195,7 +195,7 @@ contract SparklaunchSale {
     function setSaleParams(
         address _token,
         address _saleOwner,
-        uint256 _tokenPriceInBNB,
+        uint256 _tokensFor1BNB,
         uint256 _saleEnd,
         uint256 _saleStart,
         uint256 _publicRoundStartDelta,
@@ -210,7 +210,7 @@ contract SparklaunchSale {
         );
         require(_saleOwner != address(0), "Invalid sale owner address.");
         require(
-            _tokenPriceInBNB != 0 &&
+            _tokensFor1BNB != 0 &&
                 _hardCap != 0 &&
                 _softCap != 0 &&
                 _saleEnd > block.timestamp,
@@ -232,7 +232,7 @@ contract SparklaunchSale {
         sale.token = IERC20(_token);
         sale.isCreated = true;
         sale.saleOwner = _saleOwner;
-        sale.tokenPriceInBNB = _tokenPriceInBNB;
+        sale.tokensFor1BNB = _tokensFor1BNB;
         sale.saleEnd = _saleEnd;
         sale.hardCap = _hardCap;
         sale.softCap = _softCap;
@@ -243,7 +243,7 @@ contract SparklaunchSale {
         // Emit event
         emit SaleCreated(
             sale.saleOwner,
-            sale.tokenPriceInBNB,
+            sale.tokensFor1BNB,
             sale.saleEnd,
             sale.hardCap,
             sale.softCap
@@ -298,7 +298,7 @@ contract SparklaunchSale {
     }
 
     function calculateMaxTokensForLiquidity() public view returns (uint256) {
-        uint256 maxBNBAmount = (sale.hardCap * sale.tokenPriceInBNB) /
+        uint256 maxBNBAmount = (sale.hardCap * sale.tokensFor1BNB) /
             10**decimals;
         uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate) /
             10**18;
@@ -316,9 +316,11 @@ contract SparklaunchSale {
         // Mark that tokens are deposited
         sale.tokensDeposited = true;
 
+        uint256 tokensToSell = sale.hardCap.mul(sale.tokensFor1BNB).div(10**18);
+
         uint256 lpTokens = calculateMaxTokensForLiquidity();
 
-        uint256 amount = sale.hardCap.add(lpTokens);
+        uint256 amount = tokensToSell.add(lpTokens);
 
         // Perform safe transfer
         sale.token.transferFrom(msg.sender, address(this), amount);
@@ -363,16 +365,14 @@ contract SparklaunchSale {
         require(block.timestamp <= sale.saleEnd, "Sale finished");
 
         // Compute the amount of tokens user is buying
-        uint256 amountOfTokensBuying = (amountBNB)
-            .mul(uint256(10)**IERC20Metadata(address(sale.token)).decimals())
-            .div(sale.tokenPriceInBNB);
+        uint256 amountOfTokensBuying = (amountBNB).mul(sale.tokensFor1BNB).div(10**18);
 
         // Must buy more than 0 tokens
         require(amountOfTokensBuying > 0, "Can't buy 0 tokens");
 
         // Require that amountOfTokensBuying is less than sale token leftover cap
         require(
-            amountOfTokensBuying <= sale.hardCap.sub(sale.totalTokensSold),
+            amountBNB <= sale.hardCap.sub(sale.totalBNBRaised),
             "Not enough tokens to sell."
         );
 
@@ -442,7 +442,10 @@ contract SparklaunchSale {
     function finishSale() external onlySaleOwnerOrAdmin {
         require(block.timestamp >= sale.saleEnd, "Sale is not finished yet");
         require(saleFinished == false, "The function can be called only once");
-        if (sale.totalTokensSold >= sale.softCap) {
+        if (sale.totalBNBRaised >= sale.softCap) {
+            //if(lpPercentage >= 9650){
+            //    
+            //}
             BNBAmountForLiquidity =
                 (sale.totalBNBRaised * lpPercentage) /
                 10000;
@@ -552,6 +555,9 @@ contract SparklaunchSale {
         uint256 totalProfit = sale.totalBNBRaised.sub(BNBAmountForLiquidity);
         uint256 totalFee = _calculateServiceFee(totalProfit);
         uint256 saleOwnerProfit = totalProfit.sub(totalFee);
+        console.log(saleOwnerProfit, 'saleOwnerProfit');
+        console.log(sale.totalBNBRaised, 'sale.totalBNBRaised');
+        console.log(sale.totalBNBRaised, 'sale.totalBNBRaised');
 
         safeTransferBNB(msg.sender, saleOwnerProfit);
         safeTransferBNB(feeAddr, totalFee);
@@ -571,6 +577,7 @@ contract SparklaunchSale {
 
         // Amount of tokens which are not sold
         uint256 leftover = sale.token.balanceOf(address(this));
+        console.log(leftover, 'leftover');
 
         if (leftover > 0) {
             sale.token.transfer(msg.sender, leftover);
