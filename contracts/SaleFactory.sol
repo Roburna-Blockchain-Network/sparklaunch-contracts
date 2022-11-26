@@ -4,34 +4,36 @@ pragma solidity ^0.8.6;
 import "./SparkLaunchSale.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import 'hardhat/console.sol';
 
 
-
-contract SalesFactory is Ownable{
-
+contract SalesFactory is Ownable {
     IAdmin public admin;
     address payable public feeAddr;
     uint256 public fee;
     uint256 public serviceFee;
-    mapping (uint256 => address) public saleIdToAddress;
-    mapping (address => address) public saleAddressToSaleOwner;
-
+    mapping(uint256 => address) public saleIdToAddress;
+    mapping(address => address) public saleAddressToSaleOwner;
 
     // Expose so query can be possible only by position as well
-    address [] public allSales;
+    address[] public allSales;
 
     event SaleDeployed(address saleContract);
-    event SaleOwnerAndTokenSetInFactory(address sale, address saleOwner, address saleToken);
+    event SaleOwnerAndTokenSetInFactory(
+        address sale,
+        address saleOwner,
+        address saleToken
+    );
     event LogSetFee(uint256 newFee);
     event LogSetFeeAddr(address newAddress);
     event LogWithdrawalBNB(address account, uint256 amount);
 
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         require(admin.isAdmin(msg.sender), "Only Admin can deploy sales");
         _;
     }
 
-    constructor (address _adminContract) {
+    constructor(address _adminContract) {
         require(_adminContract != address(0), "Invalid address");
         admin = IAdmin(_adminContract);
     }
@@ -55,37 +57,41 @@ contract SalesFactory is Ownable{
     }
 
     function calculateMaxTokensForLiquidity(
-        uint256 hardCap, 
-        uint256 tokenPriceInBNB, 
-        uint256 lpPercentage,
+        uint256 hardCap,
+        uint256 tokensFor1BNB,
         uint256 pcsListingRate,
-        uint8 decimals) 
-    public 
-    view 
-    returns(uint256)                                   
-    {
-        uint256 maxBNBAmount = (hardCap * tokenPriceInBNB)/ 10**decimals;
-        uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate)/ 10**18;
-        return(_tokensAmountForLiquidity);
+        uint8 decimals
+    ) public pure returns (uint256) {
+       
+        uint256 _tokensAmountForLiquidity = (hardCap * pcsListingRate) /
+            10**18;
+            
+        return (_tokensAmountForLiquidity);
     }
 
     function deployNormalSale(
-        address [] memory setupAddys,
-        uint256 [] memory uints,
-        address [] memory wlAddys,
-        uint256 [] memory tiers4WL,
-        uint256 [] memory startTimes,
-        uint256 id)
-    external 
-    payable 
-    {   require(msg.value >= fee, "Not enough bnb sent");
+        address[] memory setupAddys,
+        uint256[] memory uints,
+        address[] memory wlAddys,
+        uint256[] memory tiers4WL,
+        uint256[] memory startTimes,
+        bool isPublic
+    ) external payable {
+        require(msg.value >= fee, "Not enough bnb sent");
         uint8 decimals = IERC20Metadata(setupAddys[2]).decimals();
-        
-    
-        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[9], uints[5], uints[2], uints[3], decimals);
 
-        uint256 amount = uints[9] + lpTokens;
-       
+        uint256 lpTokens = calculateMaxTokensForLiquidity(
+            uints[9],
+            uints[5],
+            uints[3],
+            decimals
+        );
+        
+        uint256 tokensToSell = (uints[9] * uints[5]) / 10**18;
+        uint256 amount = tokensToSell + lpTokens;
+        console.log(lpTokens, 'lpTokens');
+        console.log(amount);
+
         IERC20(setupAddys[2]).transferFrom(
             setupAddys[3],
             address(this),
@@ -99,16 +105,19 @@ contract SalesFactory is Ownable{
             tiers4WL,
             startTimes,
             feeAddr,
-            serviceFee
+            serviceFee,
+            isPublic
         );
 
-        IERC20(setupAddys[2]).approve(address(sale), amount);
-        sale.depositTokens();
+        
+        uint256 id = allSales.length;
 
-        require(saleIdToAddress[id] == address(0), "Id already used");
         saleIdToAddress[id] = address(sale);
         saleAddressToSaleOwner[address(sale)] = msg.sender;
 
+        IERC20(setupAddys[2]).approve(address(sale), amount);
+    
+        sale.depositTokens();
         allSales.push(address(sale));
         feeAddr.transfer(msg.value);
 
@@ -116,32 +125,36 @@ contract SalesFactory is Ownable{
     }
 
     // Function to return number of pools deployed
-    function getNumberOfSalesDeployed() external view returns (uint) {
+    function getNumberOfSalesDeployed() external view returns (uint256) {
         return allSales.length;
     }
 
-    function getSaleAddress(uint256 id) external view returns (address){
+    function getSaleAddress(uint256 id) external view returns (address) {
         return saleIdToAddress[id];
     }
 
     // Function
     function getLastDeployedSale() external view returns (address) {
         //
-        if(allSales.length > 0) {
+        if (allSales.length > 0) {
             return allSales[allSales.length - 1];
         }
         return address(0);
     }
 
     // Function to get all sales
-    function getAllSales(uint startIndex, uint endIndex) external view returns (address[] memory) {
+    function getAllSales(uint256 startIndex, uint256 endIndex)
+        external
+        view
+        returns (address[] memory)
+    {
         require(endIndex > startIndex, "Bad input");
         require(endIndex <= allSales.length, "access out of rage");
 
         address[] memory sales = new address[](endIndex - startIndex);
-        uint index = 0;
+        uint256 index = 0;
 
-        for(uint i = startIndex; i < endIndex; i++) {
+        for (uint256 i = startIndex; i < endIndex; i++) {
             sales[index] = allSales[i];
             index++;
         }
@@ -149,10 +162,13 @@ contract SalesFactory is Ownable{
         return sales;
     }
 
-    function withdrawBNB(address payable account, uint256 amount) external onlyAdmin {
+    function withdrawBNB(address payable account, uint256 amount)
+        external
+        onlyAdmin
+    {
         require(amount <= (address(this)).balance, "Incufficient funds");
         account.transfer(amount);
         emit LogWithdrawalBNB(account, amount);
     }
-
 }
+
