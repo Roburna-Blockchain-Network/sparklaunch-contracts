@@ -58,9 +58,7 @@ contract SalesFactory is Ownable {
 
     function calculateMaxTokensForLiquidity(
         uint256 hardCap,
-        uint256 tokensFor1BNB,
-        uint256 pcsListingRate,
-        uint8 decimals
+        uint256 pcsListingRate
     ) public pure returns (uint256) {
        
         uint256 _tokensAmountForLiquidity = (hardCap * pcsListingRate) /
@@ -78,13 +76,10 @@ contract SalesFactory is Ownable {
         bool isPublic
     ) external payable {
         require(msg.value >= fee, "Not enough bnb sent");
-        uint8 decimals = IERC20Metadata(setupAddys[2]).decimals();
 
         uint256 lpTokens = calculateMaxTokensForLiquidity(
             uints[9],
-            uints[5],
-            uints[3],
-            decimals
+            uints[3]
         );
         
         uint256 tokensToSell = (uints[9] * uints[5]) / 10**18;

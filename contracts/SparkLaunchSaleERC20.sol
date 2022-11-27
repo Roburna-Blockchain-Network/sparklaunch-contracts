@@ -40,6 +40,7 @@ contract SparklaunchSaleERC20 {
     bool public saleFinished;
     bool public lpWithdrawn;
     bool public leftoverWithdrawnCancelledSale;
+    bool public isPublic;
     uint256 public minParticipation; 
     uint256 public maxParticipation; 
     uint256 public saleStartTime;
@@ -159,7 +160,8 @@ contract SparklaunchSaleERC20 {
         uint256 [] memory tiers4WL,
         uint256 [] memory startTimes,
         address _feeAddr,
-        uint256 _serviceFee
+        uint256 _serviceFee,
+        bool _isPublic
     ){
         require(setupAddys[1] != address(0), "Address zero validation");
         require(setupAddys[0] != address(0), "Address zero validation");
@@ -179,7 +181,9 @@ contract SparklaunchSaleERC20 {
         pcsListingRate = uints[3];
         liquidityLockPeriod = uints[4];
         factory = msg.sender;
-        setSaleParams(setupAddys[2],setupAddys[3],uints[5],uints[6],uints[7],uints[8],uints[9],uints[10]);
+        isPublic = _isPublic;
+        publicRoundStartDelta = uints[8];
+        setSaleParams(setupAddys[2],setupAddys[3],uints[5],uints[6],uints[7],uints[9],uints[10]);
         grantATierMultiply(wlAddys, tiers4WL);
         setRounds(startTimes);     
     }
@@ -192,7 +196,6 @@ contract SparklaunchSaleERC20 {
         uint256 _tokenPriceInERC20,
         uint256 _saleEnd,
         uint256 _saleStart,
-        uint256 _publicRoundStartDelta,
         uint256 _hardCap,
         uint256 _softCap
     )
@@ -225,7 +228,6 @@ contract SparklaunchSaleERC20 {
         sale.saleEnd = _saleEnd;
         sale.hardCap = _hardCap;
         sale.softCap = _softCap;
-        publicRoundStartDelta = _publicRoundStartDelta;
         saleStartTime = _saleStart;
 
 
@@ -279,8 +281,8 @@ contract SparklaunchSaleERC20 {
     }
 
     function calculateMaxTokensForLiquidity() public view returns(uint256){
-        uint256 maxERC20Amount = (sale.hardCap * sale.tokenPriceInERC20)/ 10**decimals;
-        uint256 _tokensAmountForLiquidity = (maxERC20Amount * pcsListingRate)/ 10**tokenERC20decimals;
+        
+        uint256 _tokensAmountForLiquidity = (sale.hardCap * pcsListingRate)/ 10**tokenERC20decimals;
         return(_tokensAmountForLiquidity);
     }
 
@@ -304,9 +306,11 @@ contract SparklaunchSaleERC20 {
         // Mark that tokens are deposited
         sale.tokensDeposited = true;
 
+        uint256 tokensToSell = sale.hardCap.mul(sale.tokenPriceInERC20).div(tokenERC20decimals);
+
         uint256 lpTokens = calculateMaxTokensForLiquidity();
 
-        uint256 amount = sale.hardCap.add(lpTokens);
+        uint256 amount = tokensToSell.add(lpTokens);
 
         // Perform safe transfer
         sale.token.transferFrom(
@@ -349,8 +353,7 @@ contract SparklaunchSaleERC20 {
     
 
         // Compute the amount of tokens user is buying
-        uint256 amountOfTokensBuying =
-            (amountERC20).mul(uint(10) ** IERC20Metadata(address(sale.token)).decimals()).div(sale.tokenPriceInERC20);
+        uint256 amountOfTokensBuying = (amountERC20).mul(sale.tokenPriceInERC20).div(10**tokenERC20decimals);
 
         // Must buy more than 0 tokens
         require(amountOfTokensBuying > 0, "Can't buy 0 tokens");
@@ -358,7 +361,7 @@ contract SparklaunchSaleERC20 {
 
         // Require that amountOfTokensBuying is less than sale token leftover cap
         require(
-            amountOfTokensBuying <= sale.hardCap.sub(sale.totalTokensSold),
+            amountERC20 <= sale.hardCap.sub(sale.totalERC20Raised),
             "Not enough tokens to sell."
         );
 
@@ -431,9 +434,14 @@ contract SparklaunchSaleERC20 {
     function finishSale() external onlySaleOwnerOrAdmin{
         require(block.timestamp >= sale.saleEnd, "Sale is not finished yet");
         require(saleFinished == false, "The function can be called only once");
-        if(sale.totalTokensSold >= sale.softCap){
+        if(sale.totalERC20Raised >= sale.softCap){
+            uint256 fee =  _calculateServiceFee(sale.totalERC20Raised) ;
+            sale.totalERC20Raised = sale.totalERC20Raised.sub(fee);
+            bool success = IERC20(tokenERC20).transfer(msg.sender, fee);
+            require(success);
+
             ERC20AmountForLiquidity = (sale.totalERC20Raised * lpPercentage) / 10000;
-            tokensAmountForLiquidity = (ERC20AmountForLiquidity * pcsListingRate) / 10**18;
+            tokensAmountForLiquidity = (ERC20AmountForLiquidity * pcsListingRate) / 10**tokenERC20decimals;
             isSaleSuccessful = true;
             saleFinished = true;
             addLiquidity(tokensAmountForLiquidity, ERC20AmountForLiquidity);
@@ -527,16 +535,13 @@ contract SparklaunchSaleERC20 {
 
         // Earnings amount of the owner in ERC20
         uint256 totalProfit = sale.totalERC20Raised.sub(ERC20AmountForLiquidity);
-        uint256 totalFee = _calculateServiceFee(totalProfit);
-        uint256 saleOwnerProfit = totalProfit.sub(totalFee);
+        
 
         // Transfer tokens 
-        bool success = IERC20(tokenERC20).transfer(msg.sender, saleOwnerProfit);
+        bool success = IERC20(tokenERC20).transfer(msg.sender, totalProfit);
         require(success);
-        bool success2 = IERC20(tokenERC20).transfer(feeAddr, totalFee);
-        require(success2);
+        
     }
-
 
     function withdrawLeftoverIfSaleCancelled() private {
         require(saleFinished == true && isSaleSuccessful == false, "Sale wasnt cancelled");

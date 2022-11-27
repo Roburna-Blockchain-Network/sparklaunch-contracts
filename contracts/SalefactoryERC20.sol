@@ -56,17 +56,14 @@ contract SalesFactoryERC20 is Ownable{
 
     function calculateMaxTokensForLiquidity(
         uint256 hardCap, 
-        uint256 tokenPriceInBNB, 
-        uint256 lpPercentage,
         uint256 pcsListingRate,
-        uint8 decimals,
         uint8 decimalsPaymentToken) 
     public 
-    view 
+    pure 
     returns(uint256)                                   
     {
-        uint256 maxERC20Amount = (hardCap * tokenPriceInBNB)/ 10**decimals;
-        uint256 _tokensAmountForLiquidity = (maxERC20Amount * pcsListingRate)/ 10**decimalsPaymentToken;
+        
+        uint256 _tokensAmountForLiquidity = (hardCap * pcsListingRate)/ 10**decimalsPaymentToken;
         return(_tokensAmountForLiquidity);
     }
 
@@ -76,16 +73,16 @@ contract SalesFactoryERC20 is Ownable{
         address [] memory wlAddys,
         uint256 [] memory tiers4WL,
         uint256 [] memory startTimes,
-        uint256 id)
+        bool isPublic)
     external 
     payable 
     {   require(msg.value >= fee, "Not enough bnb sent");
-        uint8 decimals = IERC20Metadata(setupAddys[2]).decimals();
         uint8 decimalsPaymentToken = IERC20Metadata(setupAddys[4]).decimals();
     
-        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[9], uints[5], uints[2], uints[3], decimals, decimalsPaymentToken);
+        uint256 lpTokens = calculateMaxTokensForLiquidity(uints[9], uints[5], decimalsPaymentToken);
 
-        uint256 amount = uints[9] + lpTokens;
+        uint256 tokensToSell = (uints[9] * uints[5]) / 10**decimalsPaymentToken;
+        uint256 amount = tokensToSell + lpTokens;
        
         IERC20(setupAddys[2]).transferFrom(
             setupAddys[3],
@@ -100,11 +97,14 @@ contract SalesFactoryERC20 is Ownable{
             tiers4WL,
             startTimes,
             feeAddr,
-            serviceFee
+            serviceFee,
+            isPublic
         );
 
         IERC20(setupAddys[2]).approve(address(sale), amount);
         sale.depositTokens();
+
+        uint256 id = allSales.length;
 
         require(saleIdToAddress[id] == address(0), "Id already used");
         saleIdToAddress[id] = address(sale);
