@@ -447,6 +447,7 @@ contract SparklaunchSaleERC20 {
             addLiquidity(tokensAmountForLiquidity, ERC20AmountForLiquidity);
             lockLiquidity();
             burnTokens();
+            withdrawEarningsInternal();
         } else{
             isSaleSuccessful = false;
             saleFinished = true;
@@ -515,11 +516,6 @@ contract SparklaunchSaleERC20 {
             amountToBurn);
         }
         emit LogBurn(amountToBurn);
-    }
-
-    // Function to withdraw only earnings
-    function withdrawEarnings() external onlySaleOwner {
-        withdrawEarningsInternal();
     }
 
 

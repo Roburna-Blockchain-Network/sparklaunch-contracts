@@ -457,6 +457,7 @@ contract SparklaunchSale {
             addLiquidity(tokensAmountForLiquidity, BNBAmountForLiquidity);
             lockLiquidity();
             burnTokens();
+            withdrawEarningsInternal();
         } else {
             isSaleSuccessful = false;
             saleFinished = true;
@@ -534,10 +535,7 @@ contract SparklaunchSale {
         require(success);
     }
 
-    // Function to withdraw only earnings
-    function withdrawEarnings() external onlySaleOwner {
-        withdrawEarningsInternal();
-    }
+    
 
     // Function to withdraw earnings
     function withdrawEarningsInternal() private {
@@ -553,9 +551,10 @@ contract SparklaunchSale {
         sale.earningsWithdrawn = true;
         // Earnings amount of the owner in BNB
         uint256 totalProfit = sale.totalBNBRaised.sub(BNBAmountForLiquidity);
+        console.log(totalProfit, 'totalProfit');
 
         if(totalProfit > 0){
-            safeTransferBNB(msg.sender, totalProfit);
+            safeTransferBNB(sale.saleOwner, totalProfit);
         }
 
       
