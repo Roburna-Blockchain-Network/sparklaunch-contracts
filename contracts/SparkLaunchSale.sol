@@ -298,9 +298,7 @@ contract SparklaunchSale {
     }
 
     function calculateMaxTokensForLiquidity() public view returns (uint256) {
-        uint256 maxBNBAmount = (sale.hardCap * sale.tokensFor1BNB) /
-            10**decimals;
-        uint256 _tokensAmountForLiquidity = (maxBNBAmount * pcsListingRate) /
+        uint256 _tokensAmountForLiquidity = (sale.hardCap * pcsListingRate) /
             10**18;
         return (_tokensAmountForLiquidity);
     }
@@ -365,7 +363,9 @@ contract SparklaunchSale {
         require(block.timestamp <= sale.saleEnd, "Sale finished");
 
         // Compute the amount of tokens user is buying
-        uint256 amountOfTokensBuying = (amountBNB).mul(sale.tokensFor1BNB).div(10**18);
+        uint256 amountOfTokensBuying = (amountBNB).mul(sale.tokensFor1BNB).div(
+            10**18
+        );
 
         // Must buy more than 0 tokens
         require(amountOfTokensBuying > 0, "Can't buy 0 tokens");
@@ -443,12 +443,11 @@ contract SparklaunchSale {
         require(block.timestamp >= sale.saleEnd, "Sale is not finished yet");
         require(saleFinished == false, "The function can be called only once");
         if (sale.totalBNBRaised >= sale.softCap) {
-            //if(lpPercentage >= 9650){
-            //    
-            //}
-            BNBAmountForLiquidity =
-                (sale.totalBNBRaised * lpPercentage) /
-                10000;
+            uint256 fee = _calculateServiceFee(sale.totalBNBRaised);
+            uint256 totalRaised = sale.totalBNBRaised.sub(fee);
+            safeTransferBNB(feeAddr, fee);
+
+            BNBAmountForLiquidity = (totalRaised * lpPercentage) / 10000;
             tokensAmountForLiquidity =
                 (BNBAmountForLiquidity * pcsListingRate) /
                 10**18;
@@ -457,6 +456,7 @@ contract SparklaunchSale {
             addLiquidity(tokensAmountForLiquidity, BNBAmountForLiquidity);
             lockLiquidity();
             burnTokens();
+            withdrawEarningsInternal();
         } else {
             isSaleSuccessful = false;
             saleFinished = true;
@@ -534,11 +534,6 @@ contract SparklaunchSale {
         require(success);
     }
 
-    // Function to withdraw only earnings
-    function withdrawEarnings() external onlySaleOwner {
-        withdrawEarningsInternal();
-    }
-
     // Function to withdraw earnings
     function withdrawEarningsInternal() private {
         require(
@@ -552,15 +547,11 @@ contract SparklaunchSale {
         require(!sale.earningsWithdrawn, "can't withdraw twice");
         sale.earningsWithdrawn = true;
         // Earnings amount of the owner in BNB
-        uint256 totalProfit = sale.totalBNBRaised.sub(BNBAmountForLiquidity);
-        uint256 totalFee = _calculateServiceFee(totalProfit);
-        uint256 saleOwnerProfit = totalProfit.sub(totalFee);
-        console.log(saleOwnerProfit, 'saleOwnerProfit');
-        console.log(sale.totalBNBRaised, 'sale.totalBNBRaised');
-        console.log(sale.totalBNBRaised, 'sale.totalBNBRaised');
+        uint256 totalProfit = address(this).balance;
 
-        safeTransferBNB(msg.sender, saleOwnerProfit);
-        safeTransferBNB(feeAddr, totalFee);
+        if (totalProfit > 0) {
+            safeTransferBNB(sale.saleOwner, totalProfit);
+        }
     }
 
     function withdrawLeftoverIfSaleCancelled() private {
@@ -577,7 +568,7 @@ contract SparklaunchSale {
 
         // Amount of tokens which are not sold
         uint256 leftover = sale.token.balanceOf(address(this));
-        console.log(leftover, 'leftover');
+        console.log(leftover, "leftover");
 
         if (leftover > 0) {
             sale.token.transfer(msg.sender, leftover);

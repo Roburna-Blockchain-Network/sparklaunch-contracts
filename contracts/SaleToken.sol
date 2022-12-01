@@ -4,9 +4,12 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract SaleToken is ERC20("Mock BUSD", "BUSD") {
-    constructor() {
-        // mint 1 million BUSD / 18 decimals
-        _mint(msg.sender, 10**24);
+contract SaleToken is ERC20 {
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address receiver
+    ) ERC20(_name, _symbol) {
+        _mint(receiver, 10**27);
     }
 }

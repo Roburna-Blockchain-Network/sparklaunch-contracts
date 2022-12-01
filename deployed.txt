@@ -1,0 +1,20 @@
+
+Token Name      : Joanne
+Token Symbol    : ZAP
+Token Address   : 0x8192f4b720641649f6Ef8ee67241438eF8715BB7
+=============================================
+
+Token Name      : Milan
+Token Symbol    : XUG
+Token Address   : 0x7bc17d0beEFc9C37FF4ed78C2b1FcC65Ff6f784b
+=============================================
+
+Token Name      : Arturo
+Token Symbol    : BVZ
+Token Address   : 0x307653D2B7ed1508B8367194DdaC2A354C139657
+=============================================
+
+Token Name      : Nikko
+Token Symbol    : POK
+Token Address   : 0xE936AA9Ed50b364c13Db98CE233bEdFfA23612Ba
+=============================================

@@ -5,9 +5,9 @@ require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 // require("./scripts/deploySale.js");
- require("./scripts/participate.js");
+// require("./scripts/participate.js");
 // require("./scripts/finishSale.js");
- require("./scripts/getSale.js");
+// require("./scripts/getSale.js");
 // require("./scripts/withdrawLP.js");
 // require("./scripts/withdraw.js");
 
@@ -21,7 +21,7 @@ module.exports = {
       },
     },
   },
-  defaultNetwork: "bscTestnet",
+  defaultNetwork: "roburna",
   networks: {
     hardhat: {
       forking: {
