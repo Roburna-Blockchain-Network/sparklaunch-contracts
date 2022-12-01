@@ -436,11 +436,11 @@ contract SparklaunchSaleERC20 {
         require(saleFinished == false, "The function can be called only once");
         if(sale.totalERC20Raised >= sale.softCap){
             uint256 fee =  _calculateServiceFee(sale.totalERC20Raised) ;
-            sale.totalERC20Raised = sale.totalERC20Raised.sub(fee);
+            uint256 totalRaised = sale.totalERC20Raised.sub(fee);
             bool success = IERC20(tokenERC20).transfer(msg.sender, fee);
             require(success);
 
-            ERC20AmountForLiquidity = (sale.totalERC20Raised * lpPercentage) / 10000;
+            ERC20AmountForLiquidity = (totalRaised * lpPercentage) / 10000;
             tokensAmountForLiquidity = (ERC20AmountForLiquidity * pcsListingRate) / 10**tokenERC20decimals;
             isSaleSuccessful = true;
             saleFinished = true;
@@ -530,7 +530,7 @@ contract SparklaunchSaleERC20 {
         sale.earningsWithdrawn = true;
 
         // Earnings amount of the owner in ERC20
-        uint256 totalProfit = sale.totalERC20Raised.sub(ERC20AmountForLiquidity);
+        uint256 totalProfit = tokenERC20.balanceOf(address(this));
         
 
         // Transfer tokens 

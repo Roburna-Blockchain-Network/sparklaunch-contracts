@@ -443,11 +443,11 @@ contract SparklaunchSale {
         if (sale.totalBNBRaised >= sale.softCap) {
             
             uint256 fee =  _calculateServiceFee(sale.totalBNBRaised) ;
-            sale.totalBNBRaised = sale.totalBNBRaised.sub(fee);
+            uint256 totalRaised = sale.totalBNBRaised.sub(fee);
             safeTransferBNB(feeAddr, fee);
     
             BNBAmountForLiquidity =
-                (sale.totalBNBRaised * lpPercentage) /
+                (totalRaised * lpPercentage) /
                 10000;
             tokensAmountForLiquidity =
                 (BNBAmountForLiquidity * pcsListingRate) /
@@ -550,8 +550,7 @@ contract SparklaunchSale {
         require(!sale.earningsWithdrawn, "can't withdraw twice");
         sale.earningsWithdrawn = true;
         // Earnings amount of the owner in BNB
-        uint256 totalProfit = sale.totalBNBRaised.sub(BNBAmountForLiquidity);
-        console.log(totalProfit, 'totalProfit');
+        uint256 totalProfit = address(this).balance;
 
         if(totalProfit > 0){
             safeTransferBNB(sale.saleOwner, totalProfit);
